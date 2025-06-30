@@ -6,161 +6,22 @@ Attempting to bind to HOST environment variable: 0.0.0.0
 If this was unintentional, check that you haven't mistakenly set it in your shell.
 Learn more here: https://cra.link/advanced-config
 
-(node:4822) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:6757) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:4822) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:6757) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
-Compiled with warnings.
+Compiled successfully!
 
-[eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used              no-unused-vars
-  Line 136:11:  'delta' is assigned a value but never used           no-unused-vars
-  Line 196:9:   'showDropoffNow' is assigned a value but never used  no-unused-vars
+You can now view react-kavia in the browser.
 
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
+  Local:            http://localhost:3000
+  On Your Network:  http://172.17.0.2:3000
 
-WARNING in [eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used              no-unused-vars
-  Line 136:11:  'delta' is assigned a value but never used           no-unused-vars
-  Line 196:9:   'showDropoffNow' is assigned a value but never used  no-unused-vars
+Note that the development build is not optimized.
+To create a production build, use npm run build.
 
-webpack compiled with 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/App.js
-  Line 58:26:   'NUM_BOTS' is not defined  no-undef
-  Line 477:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-WARNING in [eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used                      no-unused-vars
-  Line 23:7:    'BOT_INCREASE_RATE' is assigned a value but never used       no-unused-vars
-  Line 24:7:    'OBSTACLE_INCREASE_RATE' is assigned a value but never used  no-unused-vars
-  Line 25:7:    'BASE_NUM_BOTS' is assigned a value but never used           no-unused-vars
-  Line 26:7:    'OBSTACLE_SIZE' is assigned a value but never used           no-unused-vars
-  Line 141:11:  'delta' is assigned a value but never used                   no-unused-vars
-  Line 201:9:   'showDropoffNow' is assigned a value but never used          no-unused-vars
-
-ERROR in [eslint] 
-src/App.js
-  Line 58:26:   'NUM_BOTS' is not defined  no-undef
-  Line 477:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-
-webpack compiled with 1 error and 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/App.js
-  Line 499:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-WARNING in [eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used                                             no-unused-vars
-  Line 23:7:    'BOT_INCREASE_RATE' is assigned a value but never used                              no-unused-vars
-  Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 80:10:   'numBots' is assigned a value but never used                                        no-unused-vars
-  Line 80:19:   'setNumBots' is assigned a value but never used                                     no-unused-vars
-  Line 81:10:   'obstacles' is assigned a value but never used                                      no-unused-vars
-  Line 81:21:   'setObstacles' is assigned a value but never used                                   no-unused-vars
-  Line 107:10:  'levelCompleted' is assigned a value but never used                                 no-unused-vars
-  Line 107:26:  'setLevelCompleted' is assigned a value but never used                              no-unused-vars
-  Line 163:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 223:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-ERROR in [eslint] 
-src/App.js
-  Line 499:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-
-webpack compiled with 1 error and 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/App.js
-  Line 509:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-WARNING in [eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used                                             no-unused-vars
-  Line 23:7:    'BOT_INCREASE_RATE' is assigned a value but never used                              no-unused-vars
-  Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 80:10:   'numBots' is assigned a value but never used                                        no-unused-vars
-  Line 80:19:   'setNumBots' is assigned a value but never used                                     no-unused-vars
-  Line 81:21:   'setObstacles' is assigned a value but never used                                   no-unused-vars
-  Line 107:10:  'levelCompleted' is assigned a value but never used                                 no-unused-vars
-  Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-ERROR in [eslint] 
-src/App.js
-  Line 509:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-
-webpack compiled with 1 error and 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/App.js
-  Line 548:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-WARNING in [eslint] 
-src/App.js
-  Line 1:46:    'useCallback' is defined but never used                                             no-unused-vars
-  Line 23:7:    'BOT_INCREASE_RATE' is assigned a value but never used                              no-unused-vars
-  Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 80:10:   'numBots' is assigned a value but never used                                        no-unused-vars
-  Line 80:19:   'setNumBots' is assigned a value but never used                                     no-unused-vars
-  Line 81:21:   'setObstacles' is assigned a value but never used                                   no-unused-vars
-  Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-ERROR in [eslint] 
-src/App.js
-  Line 548:28:  'NUM_BOTS' is not defined  no-undef
-
-Search for the keywords to learn more about each error.
-
-webpack compiled with 1 error and 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/App.js
-  Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 80:10:   'numBots' is assigned a value but never used                                        no-unused-vars
-  Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 578:9:   'handleContinueLevel' is assigned a value but never used                            no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/App.js
-  Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 80:10:   'numBots' is assigned a value but never used                                        no-unused-vars
-  Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 578:9:   'handleContinueLevel' is assigned a value but never used                            no-unused-vars
-
-webpack compiled with 1 warning
+webpack compiled successfully
 Compiling...
 Compiled with warnings.
 
@@ -169,6 +30,7 @@ src/App.js
   Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
   Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 273:9:   'postScoreMessage' is assigned a value but never used                               no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -178,5 +40,6 @@ src/App.js
   Line 68:16:   Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 171:11:  'delta' is assigned a value but never used                                          no-unused-vars
   Line 243:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 273:9:   'postScoreMessage' is assigned a value but never used                               no-unused-vars
 
 webpack compiled with 1 warning

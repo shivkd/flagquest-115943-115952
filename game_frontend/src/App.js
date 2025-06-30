@@ -289,15 +289,15 @@ function App() {
         newWinner = "bot";
         endMsg = "You were caught by a bot!";
       }
-      if (newPlayerScore >= 3) {
-        // Instead of outright game over for player victory:
-        // Show 'Level completed!' screen and wait for Continue
+      // NEW: Level completes and "Continue" pops up as soon as player earns 1 point by delivering flag
+      if (playerScored) {
+        // Immediately trigger level completion and allow progression
         setLevelCompleted(true);
         setGamestate("levelcomplete");
         setRunning(false);
-        setMessage("");
+        setMessage("Flag delivered! +1 point.");
         setWinner("player");
-        return; // stop loop
+        return; // stop loop, do not allow additional progress until Continue
       }
       if (Math.max(...newBotScores) >= 3) {
         gameOver = true;
@@ -310,9 +310,6 @@ function App() {
         setWinner(newWinner);
         setMessage(endMsg);
         setDropoffBox(null);
-      } else if (playerScored && !gameOver) {
-        setMessage(postScoreMessage);
-        // Level stays the same for multi-point threshold, only increase once level is won (3 points)
       } else {
         setMessage("");
       }
