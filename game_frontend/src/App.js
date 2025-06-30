@@ -8,14 +8,23 @@ import "./App.css";
  * - UI: Scoreboard (top), game area (center), controls (bottom).
  */
 
-// Constants for game
+/*
+ * Constants for game parameters and visuals
+ * - Custom constants for scalable bot speed and new visuals
+ */
+
 const CANVAS_W = 420;
 const CANVAS_H = 300;
 const PLAYER_SIZE = 26;
 const BOT_SIZE = 26;
 const FLAG_SIZE = 18;
 const PLAYER_SPEED = 3.1; // px per tick
-const BOT_SPEED = 2.15;
+
+// --- Bot speed scaling constants ---
+const BOT_BASE_SPEED = 1.28; // Start bots much slower than before
+const BOT_SPEED_PER_LEVEL = 0.42; // Speed boost per level (scales up, capped)
+const BOT_SPEED_CAP = 4.5; // Max bot speed
+
 const FLAG_ZONE_RADIUS = 32;
 const DROPOFF_BOX_SIZE = 30;
 
@@ -192,21 +201,24 @@ function App() {
         px = newPx;
         py = newPy;
       }
-      // Bots: Move toward flag/player with simple AI, avoid obstacles if path blocked (primitive)
+
+      // --- Calculate bot speed for this level ---
+      const currentBotSpeed = Math.min(
+        BOT_BASE_SPEED + BOT_SPEED_PER_LEVEL * (level - 1),
+        BOT_SPEED_CAP
+      );
+
+      // --- Bots: Move toward the PLAYER (attack/chase only, never chase flag) ---
       let newBots = bots.map((bot, i) => {
-        let target;
-        if (flag.heldBy === "player") {
-          target = { x: player.x, y: player.y };
-        } else {
-          target = flag.heldBy === null ? flag : player;
-        }
+        // Always attack the player directly
+        let target = { x: px, y: py };
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let distToTgt = Math.sqrt(dx * dx + dy * dy);
         let bvx = 0, bvy = 0;
         if (distToTgt > 3) {
-          bvx = (dx / distToTgt) * BOT_SPEED;
-          bvy = (dy / distToTgt) * BOT_SPEED;
+          bvx = (dx / distToTgt) * currentBotSpeed;
+          bvy = (dy / distToTgt) * currentBotSpeed;
           // Test bot update for collision too (but bots are dumber; try single axis if col)
           let maybeBx = clamp(bot.x + bvx, BOT_SIZE/2, CANVAS_W-BOT_SIZE/2);
           let maybeBy = clamp(bot.y + bvy, BOT_SIZE/2, CANVAS_H-BOT_SIZE/2);
@@ -439,35 +451,109 @@ function App() {
     ctx.stroke();
     ctx.restore();
 
-    // Player
+    // --- Player: Draw as pentagon with blue gradient, "hero badge" look ---
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(-Math.PI/7); // for visual polish
     ctx.beginPath();
-    ctx.arc(player.x, player.y, PLAYER_SIZE / 2, 0, 2 * Math.PI, false);
-    ctx.fillStyle = "#2196f3";
+    for (let i = 0; i < 5; i++) {
+      const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+      const x = (PLAYER_SIZE/2) * Math.cos(angle);
+      const y = (PLAYER_SIZE/2) * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, -PLAYER_SIZE/2, 0, PLAYER_SIZE/2);
+    grad.addColorStop(0, "#64baff");
+    grad.addColorStop(1, "#2196f3");
+    ctx.fillStyle = grad;
+    ctx.shadowColor = "#51d5ff44";
+    ctx.shadowBlur = 10;
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2.7;
     ctx.strokeStyle = "#135488";
     ctx.stroke();
+
+    // Draw player's "eyes"
+    ctx.beginPath();
+    ctx.arc(0 - 7, -4, 2.4, 0, 2*Math.PI);
+    ctx.arc(0 + 7, -4, 2.4, 0, 2*Math.PI);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0 - 7, -4, 1, 0, 2*Math.PI); // dot pupils
+    ctx.arc(0 + 7, -4, 1, 0, 2*Math.PI);
+    ctx.fillStyle = "#135488";
+    ctx.fill();
 
     // Player name
     ctx.font = "bold 15px Arial";
     ctx.fillStyle = "#115";
     ctx.textAlign = "center";
-    ctx.fillText("You", player.x, player.y - PLAYER_SIZE / 1.1);
+    ctx.fillText("You", 0, -PLAYER_SIZE / 1.1);
+    ctx.restore();
 
-    // Bots
+    // --- Bots: Draw as 'diamond robot heads' with a red-accent look and robot eyes ---
     bots.forEach((bot, i) => {
+      ctx.save();
+      ctx.translate(bot.x, bot.y);
+      ctx.rotate(Math.PI/5); // visual variety
+
+      // Diamond body
       ctx.beginPath();
-      ctx.arc(bot.x, bot.y, BOT_SIZE / 2, 0, 2 * Math.PI, false);
-      ctx.fillStyle = "#f25266";
+      ctx.moveTo(0, -BOT_SIZE/2); // top
+      ctx.lineTo(BOT_SIZE/2, 0);  // right
+      ctx.lineTo(0, BOT_SIZE/2);  // bottom
+      ctx.lineTo(-BOT_SIZE/2, 0); // left
+      ctx.closePath();
+      const botGrad = ctx.createLinearGradient(0, -BOT_SIZE/2, 0, BOT_SIZE/2);
+      botGrad.addColorStop(0, "#fde1e1");
+      botGrad.addColorStop(1, "#f25266");
+      ctx.fillStyle = botGrad;
+      ctx.shadowColor = "#e94d77cc";
+      ctx.shadowBlur = 8;
       ctx.fill();
-      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2.2;
       ctx.strokeStyle = "#ab1549";
       ctx.stroke();
 
+      // Robot "eye strip"
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, 1.8, 7, 2, 0, 0, 2*Math.PI);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, 1.8, 4.3, 1.06, 0, 0, 2*Math.PI);
+      ctx.fillStyle = "#ffecfc";
+      ctx.globalAlpha = 0.51;
+      ctx.fill();
+      ctx.restore();
+
+      // Antenna
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, -BOT_SIZE/2);
+      ctx.lineTo(0, -BOT_SIZE/2 - 6);
+      ctx.strokeStyle = "#ab1549";
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -BOT_SIZE/2 - 7.5, 2.2, 0, 2*Math.PI);
+      ctx.fillStyle = "#ffb021";
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      ctx.restore();
+
+      // Bot label
       ctx.font = "bold 13px Arial";
       ctx.fillStyle = "#711";
       ctx.textAlign = "center";
-      ctx.fillText(`Bot${i + 1}`, bot.x, bot.y - BOT_SIZE / 1.18);
+      ctx.fillText(`Bot${i + 1}`, 0, -BOT_SIZE / 1.15);
+      ctx.restore();
     });
 
     // Draw label: who is holding the flag?
