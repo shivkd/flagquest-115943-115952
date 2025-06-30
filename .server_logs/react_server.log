@@ -6,83 +6,22 @@ Attempting to bind to HOST environment variable: 0.0.0.0
 If this was unintentional, check that you haven't mistakenly set it in your shell.
 Learn more here: https://cra.link/advanced-config
 
-(node:14025) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:14672) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:14025) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:14672) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
-Failed to compile.
+Compiled successfully!
 
-[eslint] 
-src/App.js
-Syntax error: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (583:16) (583:16)
-ERROR in ./src/App.js
-Module build failed (from ./node_modules/babel-loader/lib/index.js):
-SyntaxError: /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/src/App.js: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (583:16)
+You can now view react-kavia in the browser.
 
-  581 |                   ) : winner ? <b>Game Over!</b> : "Press Start to Play!"}
-  582 |                 </span>
-> 583 |                 <span>
-      |                 ^
-  584 |                   <b>Round:</b> 1
-  585 |                 </span>
-  586 |               </div>
-    at constructor (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:360:19)
-    at FlowParserMixin.raise (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:3327:19)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6915:18)
-    at FlowParserMixin.jsxParseElement (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6922:17)
-    at FlowParserMixin.parseExprAtom (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6932:19)
-    at FlowParserMixin.parseExprSubscripts (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10758:23)
-    at FlowParserMixin.parseUpdate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10743:21)
-    at FlowParserMixin.parseMaybeUnary (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10723:23)
-    at FlowParserMixin.parseMaybeUnaryOrPrivate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10576:61)
-    at FlowParserMixin.parseExprOps (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10581:23)
-    at FlowParserMixin.parseMaybeConditional (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10558:23)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10521:21)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5722:39
-    at FlowParserMixin.tryParse (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:3665:20)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5722:18)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10491:39
-    at FlowParserMixin.allowInAnd (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12100:12)
-    at FlowParserMixin.parseMaybeAssignAllowIn (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10491:17)
-    at FlowParserMixin.parseParenAndDistinguishExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11359:28)
-    at FlowParserMixin.parseParenAndDistinguishExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5815:18)
-    at FlowParserMixin.parseExprAtom (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11006:23)
-    at FlowParserMixin.parseExprAtom (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6937:20)
-    at FlowParserMixin.parseExprSubscripts (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10758:23)
-    at FlowParserMixin.parseUpdate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10743:21)
-    at FlowParserMixin.parseMaybeUnary (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10723:23)
-    at FlowParserMixin.parseMaybeUnaryOrPrivate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10576:61)
-    at FlowParserMixin.parseExprOps (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10581:23)
-    at FlowParserMixin.parseMaybeConditional (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10558:23)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10521:21)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5773:18)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10491:39
-    at FlowParserMixin.allowInAnd (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12100:12)
-    at FlowParserMixin.parseMaybeAssignAllowIn (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10491:17)
-    at FlowParserMixin.tryParseConditionalConsequent (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5245:29)
-    at FlowParserMixin.parseConditional (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5206:14)
-    at FlowParserMixin.parseMaybeConditional (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10562:17)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10521:21)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5773:18)
-    at FlowParserMixin.parseExpressionBase (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10475:23)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10471:39
-    at FlowParserMixin.allowInAnd (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12100:12)
-    at FlowParserMixin.parseExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10471:17)
-    at FlowParserMixin.jsxParseExpressionContainer (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6805:31)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6884:36)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
-    at FlowParserMixin.jsxParseElementAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6871:32)
+  Local:            http://localhost:3000
+  On Your Network:  http://172.17.0.2:3000
 
-ERROR in [eslint] 
-src/App.js
-  Line 583:16:  Parsing error: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (583:16)
+Note that the development build is not optimized.
+To create a production build, use npm run build.
 
-webpack compiled with 2 errors
+webpack compiled successfully
 Compiling...
 Compiled successfully!
 webpack compiled successfully
