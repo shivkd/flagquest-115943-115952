@@ -167,16 +167,7 @@ function App() {
         newFlag.heldBy = "player";
         newFlag.home = false;
       }
-      // Bots pick up flag (if not held)
-      bots.forEach((bot, i) => {
-        if (
-          !flag.heldBy &&
-          dist(bot.x, bot.y, flag.x, flag.y) < (BOT_SIZE + FLAG_SIZE) / 2 + 2
-        ) {
-          newFlag.heldBy = `bot:${bot.id}`;
-          newFlag.home = false;
-        }
-      });
+      // Bots are NOT allowed to pick up the flag - Remove bot pickup logic
 
       // Collision detection: check if any AI bot catches player
       let gameOverByAICatch = false;
@@ -196,18 +187,10 @@ function App() {
         playerScored = true;
       }
 
-      // Bot scores: bot reaches right side with flag
-      let botScored = -1;
-      bots.forEach((bot, i) => {
-        if (
-          newFlag.heldBy === `bot:${bot.id}` &&
-          bot.x > CANVAS_W - FLAG_ZONE_RADIUS - BOT_SIZE / 2
-        ) {
-          botScored = i;
-        }
-      });
+      // Bots can no longer score with the flag
+      // Remove bot scoring logic - bots cannot pick up or carry the flag
 
-      // Reset flag on score, increment appropriate score
+      // Reset flag on score, increment player score, no bot scoring
       let newPlayer = { ...player, x: px, y: py };
       let updatedBots = newBots;
       let newPlayerScore = player.score;
@@ -222,31 +205,11 @@ function App() {
           y: 2 * CANVAS_H / 3 - i * 30,
         }));
         newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
-      } else if (botScored !== -1) {
-        newBotScores[botScored] = bots[botScored].score + 1;
-        newFlag = { ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true };
-        updatedBots = bots.map((b, i) => ({
-          ...b,
-          x: CANVAS_W - 50 - i * 30,
-          y: 2 * CANVAS_H / 3 - i * 30,
-        }));
-        newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
       } else {
         // Carry flag if held
         if (newFlag.heldBy === "player") {
           newFlag.x = px;
           newFlag.y = py;
-        } else if (
-          typeof newFlag.heldBy === "string" &&
-          newFlag.heldBy.startsWith("bot:")
-        ) {
-          // Find which bot is holding by id
-          let botId = parseInt(newFlag.heldBy.split(":")[1]);
-          let idx = updatedBots.findIndex((b) => b.id === botId);
-          if (idx !== -1) {
-            newFlag.x = updatedBots[idx].x;
-            newFlag.y = updatedBots[idx].y;
-          }
         }
       }
 
@@ -383,17 +346,8 @@ function App() {
       ctx.font = "900 15px Segoe UI, Arial";
       ctx.fillStyle = "#2196f3";
       ctx.fillText("🏳️", player.x, player.y + 5);
-    } else if (flag.heldBy && typeof flag.heldBy === "string" && flag.heldBy.startsWith("bot:")) {
-      // Find which bot
-      const botId = parseInt(flag.heldBy.split(":")[1]);
-      bots.forEach((bot, i) => {
-        if (bot.id === botId) {
-          ctx.font = "900 16px Arial";
-          ctx.fillStyle = "#e75266";
-          ctx.fillText("🏳️", bot.x, bot.y + 4);
-        }
-      });
     }
+    // Bots can no longer hold the flag, so don't display flag on bots.
 
     // UI overlays: if over, draw winner
     if (gamestate === "over" || winner) {
@@ -470,7 +424,7 @@ function App() {
   // Who has flag
   let flagStatus = "Safe";
   if (flag.heldBy === "player") flagStatus = "You";
-  else if (flag.heldBy && typeof flag.heldBy === "string" && flag.heldBy.startsWith("bot:")) flagStatus = "Opponent";
+  // Bots can no longer hold the flag, so no "Opponent" state.
 
   // First bot with highest score for display
   const oppScore = Math.max(...bots.map((b) => b.score));
