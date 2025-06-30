@@ -642,15 +642,50 @@ function App() {
       let gameOver = false;
       let newWinner = null;
       let endMsg = "";
+
+      // Helper: respawn player at safe position after a death (AI or hazard), if timer > 0
+      function triggerRespawn(message) {
+        setGamestate("respawn");
+        setRunning(false);
+        setMessage(message + " Respawning...");
+        setTimeout(() => {
+          // Respawn at default location, keep all progress & state except player pos/direction
+          setPlayer(prev => ({
+            ...prev,
+            x: 60,
+            y: CANVAS_H / 2,
+            dx: 0,
+            dy: 0
+          }));
+          setMessage("");
+          setGamestate("running");
+          setRunning(true);
+          // Focus again for immediate controls
+          setTimeout(() => {
+            if (panelRef.current) panelRef.current.focus();
+          }, 70);
+        }, 1000);
+      }
+
+      // Only show overlays/freeze if time is up; otherwise, respawn
       if (gameOverByAICatch) {
-        gameOver = true;
-        newWinner = "bot";
-        endMsg = "You were caught by a bot!";
+        if (timer > 0) {
+          triggerRespawn("You were caught by a bot!");
+        } else {
+          // timer hit 0 after collision event
+          gameOver = true;
+          newWinner = "bot";
+          endMsg = "You were caught by a bot!";
+        }
       }
       if (gameOverByHazard) {
-        gameOver = true;
-        newWinner = "bot";
-        endMsg = hazardMsg;
+        if (timer > 0) {
+          triggerRespawn(hazardMsg);
+        } else {
+          gameOver = true;
+          newWinner = "bot";
+          endMsg = hazardMsg;
+        }
       }
       if (playerScored) {
         setLevelCompleted(true);
@@ -667,9 +702,13 @@ function App() {
         return;
       }
       if (Math.max(...botScoresArr) >= 3) {
-        gameOver = true;
-        newWinner = "bot";
-        endMsg = "Bots win! Try again!";
+        if (timer > 0) {
+          triggerRespawn("Bots win! Try again!");
+        } else {
+          gameOver = true;
+          newWinner = "bot";
+          endMsg = "Bots win! Try again!";
+        }
       }
       if (gameOver) {
         setGamestate("over");
@@ -699,6 +738,7 @@ function App() {
       }
 
       // Continue animation loop if still running
+      // If in respawn state, don't re-issue animation until respawn is done
       if (!gameOver && gamestate === "running") {
         anim = requestAnimationFrame(gameTick);
       }
@@ -1422,6 +1462,31 @@ function App() {
               </button>
             </div>
           )}
+
+          {/* Respawn Overlay */}
+          {gamestate === "respawn" && !sessionEnded && (
+            <div
+              className="game-overlay-panel defeat"
+              tabIndex={-1}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+                opacity: 0.92,
+                fontSize: "1.32rem",
+              }}
+            >
+              <h2 style={{ marginBottom: "7px", color: "#a33" }}>
+                Respawning...
+              </h2>
+              <div className="desc" style={{ marginBottom: "10px", color: "#c34" }}>
+                {message}
+              </div>
+            </div>
+          )}
+
           {/* Overlay: Bot/Player Win/Loss/Level End */}
           {!sessionEnded && (gamestate === "over" || winner) && (
             <div
