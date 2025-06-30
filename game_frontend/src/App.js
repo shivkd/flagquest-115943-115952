@@ -94,7 +94,7 @@ function App() {
     };
   }, [running]);
 
-  // Main game loop (fixed timestep; updating state and drawing)
+    // Main game loop (fixed timestep; updating state and drawing)
   useEffect(() => {
     let anim;
     let prevTimestamp = performance.now();
@@ -143,6 +143,11 @@ function App() {
         return { ...bot, x: bx, y: by };
       });
 
+      // Utility: Euclidean distance
+      function dist(x1, y1, x2, y2) {
+        return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+      }
+
       // Check flag pickup/drop for player and bots
       let newFlag = { ...flag };
       let playerHasFlag = flag.heldBy === "player";
@@ -164,6 +169,15 @@ function App() {
         ) {
           newFlag.heldBy = bot;
           newFlag.home = false;
+        }
+      });
+
+      // Collision detection: check if any AI bot catches player
+      let gameOverByAICatch = false;
+      newBots.forEach((bot, i) => {
+        // Collision threshold: if distance < sum of radii - fudge (~1)
+        if (dist(px, py, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
+          gameOverByAICatch = true;
         }
       });
 
@@ -229,9 +243,13 @@ function App() {
         }
       }
 
-      // End condition: first to 3 points
+      // End/game over/AI catch condition: first to 3 points or bot catches player
       let gameOver = false;
       let newWinner = null;
+      if (gameOverByAICatch) {
+        gameOver = true;
+        newWinner = "bot";
+      }
       if (newPlayerScore >= 3) {
         gameOver = true;
         newWinner = "player";
@@ -255,11 +273,6 @@ function App() {
 
       // Continue loop
       if (!gameOver) anim = requestAnimationFrame(gameTick);
-    }
-
-    // Utility function: Euclidean distance
-    function dist(x1, y1, x2, y2) {
-      return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
     }
 
     if (gamestate === "running") {
