@@ -247,23 +247,28 @@ function App() {
       // --- PLAYER PHYSICS ---
       let [px, py] = [stateRef.player.x, stateRef.player.y];
       let pvx = 0, pvy = 0;
-      // If stunned/falling: ignore input
+      // If stunned/falling: ignore input, but DO NOT block position update per tick
       let isStunned = playerStatus.stunnedUntil && playerStatus.stunnedUntil > nowMs;
       let isFalling = playerStatus.falling && playerStatus.fallUntil > nowMs;
       if (!(isStunned || isFalling)) {
+        // Regular movement (input)
         if (keyState.current.up) pvy -= PLAYER_SPEED;
         if (keyState.current.down) pvy += PLAYER_SPEED;
         if (keyState.current.left) pvx -= PLAYER_SPEED;
         if (keyState.current.right) pvx += PLAYER_SPEED;
       }
+      // Prevent "NaN" velocity bug on no input (m=0)
       if (pvx !== 0 || pvy !== 0) {
         const m = Math.sqrt(pvx * pvx + pvy * pvy);
-        pvx = (pvx / m) * PLAYER_SPEED;
-        pvy = (pvy / m) * PLAYER_SPEED;
+        if (m > 0) {
+          pvx = (pvx / m) * PLAYER_SPEED;
+          pvy = (pvy / m) * PLAYER_SPEED;
+        }
       }
       let newPx = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
       let newPy = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
-      if (!checkCollisionWithObstacles(newPx, newPy)) {
+      // Only update position if not stunned/falling, but always keep game logic alive (to avoid freeze)
+      if (!isStunned && !isFalling && !checkCollisionWithObstacles(newPx, newPy)) {
         px = newPx;
         py = newPy;
       }
@@ -280,13 +285,15 @@ function App() {
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let distToTgt = Math.sqrt(dx * dx + dy * dy);
-        let bvx = 0,
-          bvy = 0;
+        let bvx = 0, bvy = 0;
+
+        // If the bot is close, stop; else, move.
         if (distToTgt > 3) {
           bvx = (dx / distToTgt) * currentBotSpeed;
           bvy = (dy / distToTgt) * currentBotSpeed;
           let maybeBx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
           let maybeBy = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
+          // Always attempt to move, don't let hazard-related conditions interfere here
           if (!checkCollisionWithObstacles(maybeBx, maybeBy, 0)) {
             return { ...bot, x: maybeBx, y: maybeBy };
           } else if (!checkCollisionWithObstacles(bot.x + bvx, bot.y, 0)) {
@@ -393,7 +400,8 @@ function App() {
       );
       setFlag(newFlag);
 
-      if (!gameOver) anim = requestAnimationFrame(gameTick);
+      // Always keep the main game loop ticking if the state is "running"
+      if (!gameOver && stateRef.gamestate === "running") anim = requestAnimationFrame(gameTick);
     }
 
     if (gamestate === "running") {

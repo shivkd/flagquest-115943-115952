@@ -6,9 +6,9 @@ Attempting to bind to HOST environment variable: 0.0.0.0
 If this was unintentional, check that you haven't mistakenly set it in your shell.
 Learn more here: https://cra.link/advanced-config
 
-(node:25883) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:27371) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:25883) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:27371) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
 Compiled successfully!
@@ -27,256 +27,13 @@ Compiled with warnings.
 
 [eslint] 
 src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
   Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
   Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 232:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 303:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 232:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 303:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 151:17:  'setBombs' is assigned a value but never used                                       no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 153:22:  'setCrackTiles' is assigned a value but never used                                  no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 155:18:  'setLasers' is assigned a value but never used                                      no-unused-vars
-  Line 157:10:  'playerStatus' is assigned a value but never used                                   no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 313:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 151:17:  'setBombs' is assigned a value but never used                                       no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 153:22:  'setCrackTiles' is assigned a value but never used                                  no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 155:18:  'setLasers' is assigned a value but never used                                      no-unused-vars
-  Line 157:10:  'playerStatus' is assigned a value but never used                                   no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 313:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 151:17:  'setBombs' is assigned a value but never used                                       no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 153:22:  'setCrackTiles' is assigned a value but never used                                  no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 155:18:  'setLasers' is assigned a value but never used                                      no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/App.js
-  Line 33:7:    'BOMB_SIZE' is assigned a value but never used                                      no-unused-vars
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 35:7:    'BOMB_FUSE_MIN' is assigned a value but never used                                  no-unused-vars
-  Line 36:7:    'BOMB_FUSE_DELTA' is assigned a value but never used                                no-unused-vars
-  Line 37:7:    'BOMB_DIFFICULTY_FREQ' is assigned a value but never used                           no-unused-vars
-  Line 38:7:    'BOMB_LEVEL_BASE' is assigned a value but never used                                no-unused-vars
-  Line 40:7:    'CRACK_TILE_SIZE' is assigned a value but never used                                no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 42:7:    'CRACK_TILE_FREQ' is assigned a value but never used                                no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 46:7:    'LASER_LENGTH_MARGIN' is assigned a value but never used                            no-unused-vars
-  Line 47:7:    'LASER_MIN_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 48:7:    'LASER_MAX_DURATION' is assigned a value but never used                             no-unused-vars
-  Line 49:7:    'LASER_FREQ_BASE' is assigned a value but never used                                no-unused-vars
-  Line 50:7:    'LASER_FREQ_LEVEL' is assigned a value but never used                               no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 57:10:   'randomBetween' is defined but never used                                           no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 151:17:  'setBombs' is assigned a value but never used                                       no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 153:22:  'setCrackTiles' is assigned a value but never used                                  no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 155:18:  'setLasers' is assigned a value but never used                                      no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/App.js
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
-
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
-
-WARNING in [eslint] 
-src/App.js
-  Line 34:7:    'BOMB_BLAST_RADIUS' is assigned a value but never used                              no-unused-vars
-  Line 41:7:    'CRACK_TILE_LIFETIME' is assigned a value but never used                            no-unused-vars
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 45:7:    'LASER_WIDTH' is assigned a value but never used                                    no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 151:10:  'bombs' is assigned a value but never used                                          no-unused-vars
-  Line 153:10:  'crackTiles' is assigned a value but never used                                     no-unused-vars
-  Line 155:10:  'lasers' is assigned a value but never used                                         no-unused-vars
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
-
-webpack compiled with 1 warning
-Compiling...
-Compiled with warnings.
-
-[eslint] 
-src/App.js
-  Line 43:7:    'CRACK_TILE_HOLE_FADE' is assigned a value but never used                           no-unused-vars
-  Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
-  Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
-  Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
-  Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 324:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 504:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -287,10 +44,9 @@ src/App.js
   Line 53:7:    'PLAYER_STUNNED_TIME' is assigned a value but never used                            no-unused-vars
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
-  Line 157:24:  'setPlayerStatus' is assigned a value but never used                                no-unused-vars
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 324:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 504:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 webpack compiled with 1 warning
 Compiling...
@@ -303,8 +59,8 @@ src/App.js
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 326:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 506:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -316,8 +72,8 @@ src/App.js
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 326:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 506:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 webpack compiled with 1 warning
 Compiling...
@@ -330,8 +86,8 @@ src/App.js
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 326:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 507:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 Search for the keywords to learn more about each warning.
 To ignore, add // eslint-disable-next-line to the line before.
@@ -343,7 +99,7 @@ src/App.js
   Line 54:7:    'PLAYER_PENALTY_SECONDS' is assigned a value but never used                         no-unused-vars
   Line 106:16:  Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'  no-loop-func
   Line 242:11:  'delta' is assigned a value but never used                                          no-unused-vars
-  Line 319:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
-  Line 499:12:  'checkTileClash' is defined but never used                                          no-unused-vars
+  Line 326:9:   'showDropoffNow' is assigned a value but never used                                 no-unused-vars
+  Line 507:12:  'checkTileClash' is defined but never used                                          no-unused-vars
 
 webpack compiled with 1 warning
