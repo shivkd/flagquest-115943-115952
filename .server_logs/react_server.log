@@ -6,108 +6,22 @@ Attempting to bind to HOST environment variable: 0.0.0.0
 If this was unintentional, check that you haven't mistakenly set it in your shell.
 Learn more here: https://cra.link/advanced-config
 
-(node:49351) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:66343) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:49351) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:66343) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
-Compiled with warnings.
+Compiled successfully!
 
-[eslint] 
-src/App.js
-  Line 33:7:    'BOMB_MIN_DELAY' is assigned a value but never used                                     no-unused-vars
-  Line 34:7:    'BOMB_MAX_DELAY' is assigned a value but never used                                     no-unused-vars
-  Line 78:9:    Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'      no-loop-func
-  Line 334:26:  'playerScored' was used before it was defined                                           no-use-before-define
-  Line 348:28:  Function declared in a loop contains unsafe references to variable(s) 'spawn', 'spawn'  no-loop-func
-  Line 386:26:  'playerScored' was used before it was defined                                           no-use-before-define
+You can now view react-kavia in the browser.
 
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
+  Local:            http://localhost:3000
+  On Your Network:  http://172.17.0.2:3000
 
-WARNING in [eslint] 
-src/App.js
-  Line 33:7:    'BOMB_MIN_DELAY' is assigned a value but never used                                     no-unused-vars
-  Line 34:7:    'BOMB_MAX_DELAY' is assigned a value but never used                                     no-unused-vars
-  Line 78:9:    Function declared in a loop contains unsafe references to variable(s) 'pos', 'pos'      no-loop-func
-  Line 334:26:  'playerScored' was used before it was defined                                           no-use-before-define
-  Line 348:28:  Function declared in a loop contains unsafe references to variable(s) 'spawn', 'spawn'  no-loop-func
-  Line 386:26:  'playerScored' was used before it was defined                                           no-use-before-define
+Note that the development build is not optimized.
+To create a production build, use npm run build.
 
-webpack compiled with 1 warning
-Compiling...
-Failed to compile.
-
-[eslint] 
-src/App.js
-Syntax error: Identifier 'playerScored' has already been declared. (523:10) (523:10)
-ERROR in ./src/App.js
-Module build failed (from ./node_modules/babel-loader/lib/index.js):
-SyntaxError: /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/src/App.js: Identifier 'playerScored' has already been declared. (523:10)
-
-  521 |
-  522 |       // Player win condition (deliver flag to dropoff)
-> 523 |       let playerScored = false;
-      |           ^
-  524 |       if (
-  525 |         flagNext.heldBy === "player" &&
-  526 |         box &&
-    at constructor (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:360:19)
-    at FlowParserMixin.raise (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:3327:19)
-    at FlowScopeHandler.checkRedeclarationInScope (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:1555:19)
-    at FlowScopeHandler.declareName (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:1521:12)
-    at FlowScopeHandler.declareName (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:1622:11)
-    at FlowParserMixin.declareNameFromIdentifier (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:7476:16)
-    at FlowParserMixin.checkIdentifier (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:7472:12)
-    at FlowParserMixin.checkLVal (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:7413:12)
-    at FlowParserMixin.parseVarId (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:13052:10)
-    at FlowParserMixin.parseVarId (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5698:11)
-    at FlowParserMixin.parseVar (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:13027:12)
-    at FlowParserMixin.parseVarStatement (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12874:10)
-    at FlowParserMixin.parseStatementContent (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12489:23)
-    at FlowParserMixin.parseStatementLike (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12406:17)
-    at FlowParserMixin.parseStatementLike (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5140:24)
-    at FlowParserMixin.parseStatementListItem (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12386:17)
-    at FlowParserMixin.parseBlockOrModuleBlockBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12960:61)
-    at FlowParserMixin.parseBlockBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12953:10)
-    at FlowParserMixin.parseBlock (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12941:10)
-    at FlowParserMixin.parseFunctionBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11783:24)
-    at FlowParserMixin.parseFunctionBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5117:11)
-    at FlowParserMixin.parseFunctionBodyAndFinish (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11769:10)
-    at FlowParserMixin.parseFunctionBodyAndFinish (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5125:18)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:13085:12
-    at FlowParserMixin.withSmartMixTopicForbiddingContext (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12077:14)
-    at FlowParserMixin.parseFunction (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:13084:10)
-    at FlowParserMixin.parseFunctionStatement (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12769:17)
-    at FlowParserMixin.parseStatementContent (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12430:21)
-    at FlowParserMixin.parseStatementLike (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12406:17)
-    at FlowParserMixin.parseStatementLike (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5140:24)
-    at FlowParserMixin.parseStatementListItem (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12386:17)
-    at FlowParserMixin.parseBlockOrModuleBlockBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12960:61)
-    at FlowParserMixin.parseBlockBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12953:10)
-    at FlowParserMixin.parseBlock (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:12941:10)
-    at FlowParserMixin.parseFunctionBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11783:24)
-    at /home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5114:63
-    at FlowParserMixin.forwardNoArrowParamsConversionAt (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5290:16)
-    at FlowParserMixin.parseFunctionBody (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5114:12)
-    at FlowParserMixin.parseArrowExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11758:10)
-    at FlowParserMixin.parseParenAndDistinguishExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11371:12)
-    at FlowParserMixin.parseParenAndDistinguishExpression (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:5815:18)
-    at FlowParserMixin.parseExprAtom (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:11006:23)
-    at FlowParserMixin.parseExprAtom (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:6937:20)
-    at FlowParserMixin.parseExprSubscripts (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10758:23)
-    at FlowParserMixin.parseUpdate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10743:21)
-    at FlowParserMixin.parseMaybeUnary (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10723:23)
-    at FlowParserMixin.parseMaybeUnaryOrPrivate (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10576:61)
-    at FlowParserMixin.parseExprOps (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10581:23)
-    at FlowParserMixin.parseMaybeConditional (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10558:23)
-    at FlowParserMixin.parseMaybeAssign (/home/kavia/workspace/code-generation/flagquest-115943-115952/game_frontend/node_modules/@babel/parser/lib/index.js:10521:21)
-
-ERROR in [eslint] 
-src/App.js
-  Line 523:10:  Parsing error: Identifier 'playerScored' has already been declared. (523:10)
-
-webpack compiled with 2 errors
+webpack compiled successfully
 Compiling...
 Compiled with warnings.
 

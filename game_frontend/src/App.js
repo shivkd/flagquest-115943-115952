@@ -1013,13 +1013,23 @@ function App() {
   };
 
   // Pass autoStart=true for hotkey restart-and-autostart
+  // PUBLIC_INTERFACE
   const handleRestart = useCallback(
     (autoStart = false) => {
-      setObstacles(randomObstacles(0));
-      setNumBots(BASE_NUM_BOTS);
+      // Game should restart at the current level. 
+      // Compute bots and obstacles scaling for the current level.
+      const activeLevel = level;
+
+      const numBotsForLevel = BASE_NUM_BOTS + (activeLevel - 1) * BOT_INCREASE_RATE;
+      const obstaclesForLevel = randomObstacles((activeLevel - 1) * OBSTACLE_INCREASE_RATE);
+
+      setNumBots(numBotsForLevel);
+      setObstacles(obstaclesForLevel);
+
       setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
+
       setBots(
-        Array.from({ length: BASE_NUM_BOTS }, (_, idx) => ({
+        Array.from({ length: numBotsForLevel }, (_, idx) => ({
           id: idx + 1,
           x: CANVAS_W - 50 - idx * 30,
           y: (2 * CANVAS_H) / 3 - idx * 30,
@@ -1034,7 +1044,7 @@ function App() {
       setWinner(null);
       setMessage("");
       setLevelCompleted(false);
-      setLevel(1);
+      // DO NOT reset setLevel here - preserve the current level!
       setBombs([]); // clear hazards on restart
       setLasers([]);
       bombNextTimerRef.current = 0;
@@ -1048,7 +1058,7 @@ function App() {
         setRunning(false);
       }
     },
-    []
+    [level]
   );
 
   // Level-up: advance to next level
