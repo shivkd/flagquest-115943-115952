@@ -666,19 +666,11 @@ function App() {
 
   // Handle continue to next level after level-completed UI
   const handleContinueLevel = useCallback(() => {
-    // Cap maximum level at 10
-    if (level >= 10) {
-      setLevelCompleted(false);
-      setGamestate("over");
-      setWinner("player");
-      setMessage("Congratulations! You've beaten all 10 levels!");
-      setRunning(false);
-      return;
-    }
-    // Advance to next level!
-    const nextLevel = Math.min(level + 1, 10);
+    // Infinite progression: No max level cap
+    const nextLevel = level + 1;
     const newNumBots = BASE_NUM_BOTS + (nextLevel-1) * BOT_INCREASE_RATE;
     const newObstacles = randomObstacles((nextLevel-1) * OBSTACLE_INCREASE_RATE);
+
     setLevel(nextLevel);
     setNumBots(newNumBots);
     setObstacles(newObstacles);
