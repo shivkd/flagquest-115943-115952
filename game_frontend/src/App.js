@@ -17,8 +17,13 @@ const FLAG_SIZE = 18;
 const PLAYER_SPEED = 3.1; // px per tick
 const BOT_SPEED = 2.15;
 const FLAG_ZONE_RADIUS = 32;
-const NUM_BOTS = 2;
 const DROPOFF_BOX_SIZE = 30;
+
+// Level progression settings
+const BOT_INCREASE_RATE = 1;           // +1 bot per level
+const OBSTACLE_INCREASE_RATE = 1;      // +1 obstacle per level
+const BASE_NUM_BOTS = 2;
+const OBSTACLE_SIZE = 28;
 
 // Utility: clamp position to inside field
 function clamp(value, min, max) {
@@ -44,13 +49,40 @@ function randomDropoffBox(w, h, margin = 40) {
   return pos;
 }
 
+/**
+ * OBSTACLE: Returns an array of randomly placed obstacles (rectangles)
+ * Each object has {x, y} for center; obstacles do not overlap the player start, flag, drop-off, or each other.
+ */
+function randomObstacles(numObstacles = 0) {
+  if (numObstacles === 0) return [];
+  let obs = [];
+  for (let i = 0; i < numObstacles; i++) {
+    let pos;
+    let tries = 0;
+    do {
+      pos = randomPos(CANVAS_W, CANVAS_H, 38);
+      tries++;
+    } while (
+      // Avoid center start and prior obstacles (roughly)
+      (pos.x < 80 && Math.abs(pos.y - CANVAS_H/2) < 60) ||
+      obs.some(o => Math.abs(o.x - pos.x) < OBSTACLE_SIZE && Math.abs(o.y - pos.y) < OBSTACLE_SIZE) ||
+      tries > 20
+    );
+    obs.push(pos);
+  }
+  return obs;
+}
+
 // PUBLIC_INTERFACE
 function App() {
   // Game state
+  const [level, setLevel] = useState(1); // Level/progression
+  const [numBots, setNumBots] = useState(BASE_NUM_BOTS);
+  const [obstacles, setObstacles] = useState(() => randomObstacles((level-1)*OBSTACLE_INCREASE_RATE));
   const [player, setPlayer] = useState({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
   // Assign unique IDs to each bot to reliably track "heldBy"
   const [bots, setBots] = useState(() =>
-    Array.from({ length: NUM_BOTS }, (_, idx) => ({
+    Array.from({ length: BASE_NUM_BOTS }, (_, idx) => ({
       id: idx + 1,
       x: CANVAS_W - 50 - idx * 30,
       y: 2 * CANVAS_H / 3 - idx * 30,
@@ -67,17 +99,12 @@ function App() {
 
   const [timer, setTimer] = useState(120); // seconds
   const [running, setRunning] = useState(false);
-  const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over"
+  const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over", "levelcomplete"
   const [winner, setWinner] = useState(null);
   const [message, setMessage] = useState(""); // End-of-game/score message
 
-  // Level/progression state: structure for future expansion
-  const [level, setLevel] = useState(1);
-  /*
-    // Future: When implementing level progression, you'll use this state.
-    // Levels can control: number of bots, obstacles, timings, etc.
-    // Example: setLevel(level+1); and handle advanced layouts.
-  */
+  // Level completed screen state
+  const [levelCompleted, setLevelCompleted] = useState(false);
 
   const canvasRef = useRef(null);
   // Controls: which keys currently pressed (WASD/Arrows)
@@ -131,6 +158,14 @@ function App() {
     let anim;
     let prevTimestamp = performance.now();
 
+    function checkCollisionWithObstacles(x, y, margin = 4) {
+      // Returns true if (x,y) would "hit" any obstacle
+      return obstacles.some(
+        (o) => Math.abs(o.x - x) < (OBSTACLE_SIZE/2 + PLAYER_SIZE/2 + margin) &&
+               Math.abs(o.y - y) < (OBSTACLE_SIZE/2 + PLAYER_SIZE/2 + margin)
+      );
+    }
+
     function gameTick(timestamp) {
       if (gamestate !== "running") return;
       let delta = timestamp - prevTimestamp;
@@ -149,29 +184,41 @@ function App() {
         pvx = (pvx / m) * PLAYER_SPEED;
         pvy = (pvy / m) * PLAYER_SPEED;
       }
-      px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
-      py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
 
-      // Bots: Move toward flag ONLY if it's not held by the player! If the player has the flag, bots chase the player.
+      // Simulate new position & collision
+      let newPx = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
+      let newPy = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
+      if (!checkCollisionWithObstacles(newPx, newPy)) {
+        px = newPx;
+        py = newPy;
+      }
+      // Bots: Move toward flag/player with simple AI, avoid obstacles if path blocked (primitive)
       let newBots = bots.map((bot, i) => {
         let target;
-        // Bots ignore the flag if it's being held by the player
         if (flag.heldBy === "player") {
-          target = { x: player.x, y: player.y }; // chase the player with the flag (for catch mechanism)
+          target = { x: player.x, y: player.y };
         } else {
-          target = flag.heldBy === null ? flag : player; // If flag is free, move to flag, else chase player (default fallback)
+          target = flag.heldBy === null ? flag : player;
         }
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
-        let dist = Math.sqrt(dx * dx + dy * dy);
+        let distToTgt = Math.sqrt(dx * dx + dy * dy);
         let bvx = 0, bvy = 0;
-        if (dist > 3) {
-          bvx = (dx / dist) * BOT_SPEED;
-          bvy = (dy / dist) * BOT_SPEED;
+        if (distToTgt > 3) {
+          bvx = (dx / distToTgt) * BOT_SPEED;
+          bvy = (dy / distToTgt) * BOT_SPEED;
+          // Test bot update for collision too (but bots are dumber; try single axis if col)
+          let maybeBx = clamp(bot.x + bvx, BOT_SIZE/2, CANVAS_W-BOT_SIZE/2);
+          let maybeBy = clamp(bot.y + bvy, BOT_SIZE/2, CANVAS_H-BOT_SIZE/2);
+          if (!checkCollisionWithObstacles(maybeBx, maybeBy, 0)) {
+            return { ...bot, x: maybeBx, y: maybeBy };
+          } else if (!checkCollisionWithObstacles(bot.x + bvx, bot.y, 0)) {
+            return { ...bot, x: clamp(bot.x + bvx, BOT_SIZE/2, CANVAS_W-BOT_SIZE/2) };
+          } else if (!checkCollisionWithObstacles(bot.x, bot.y + bvy, 0)) {
+            return { ...bot, y: clamp(bot.y + bvy, BOT_SIZE/2, CANVAS_H-BOT_SIZE/2) };
+          }
         }
-        let bx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
-        let by = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
-        return { ...bot, x: bx, y: by };
+        return bot; // Blocked
       });
 
       // Utility: Euclidean distance
@@ -195,23 +242,20 @@ function App() {
         setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
         showDropoffNow = true;
       }
-      // The bots can no longer pick up or return the flag. Bots just chase the flag position, or the player if holding the flag.
 
       // Collision detection: bots can "catch" the player if close enough (while player has/has not flag)
       let gameOverByAICatch = false;
       newBots.forEach((bot, i) => {
-        // Collision threshold: if distance < sum of radii - fudge (~1)
         if (dist(px, py, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
           gameOverByAICatch = true;
         }
       });
 
-      // --- WIN/DELIVERY LOGIC ---
-      // Only enabled if player is carrying flag and dropoffBox is set
+      // Player win condition: delivered flag
       let playerScored = false;
       if (
         newFlag.heldBy === "player" &&
-        dropoffBox && // win box appears only after flag is picked up
+        dropoffBox &&
         dist(px, py, dropoffBox.x, dropoffBox.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
       ) {
         playerScored = true;
@@ -227,14 +271,6 @@ function App() {
       if (playerScored) {
         newPlayerScore += 1;
         postScoreMessage = "Flag delivered! +1 point.";
-        // Remove flag and drop-off, reset all positions for next round.
-        newFlag = { ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true };
-        updatedBots = bots.map((b, i) => ({
-          ...b,
-          x: CANVAS_W - 50 - i * 30,
-          y: 2 * CANVAS_H / 3 - i * 30,
-        }));
-        newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
         setDropoffBox(null);
       } else {
         // Carry flag with player if held
@@ -254,9 +290,14 @@ function App() {
         endMsg = "You were caught by a bot!";
       }
       if (newPlayerScore >= 3) {
-        gameOver = true;
-        newWinner = "player";
-        endMsg = "You win! Great job!";
+        // Instead of outright game over for player victory:
+        // Show 'Level completed!' screen and wait for Continue
+        setLevelCompleted(true);
+        setGamestate("levelcomplete");
+        setRunning(false);
+        setMessage("");
+        setWinner("player");
+        return; // stop loop
       }
       if (Math.max(...newBotScores) >= 3) {
         gameOver = true;
@@ -271,10 +312,7 @@ function App() {
         setDropoffBox(null);
       } else if (playerScored && !gameOver) {
         setMessage(postScoreMessage);
-        // For "level progression", you'll increment setLevel(level+1) and reset state here in the future.
-        // Example:
-        // setLevel(level + 1);
-        // add obstacles, increase bots, etc. for next level
+        // Level stays the same for multi-point threshold, only increase once level is won (3 points)
       } else {
         setMessage("");
       }
@@ -286,7 +324,6 @@ function App() {
       );
       setFlag(newFlag);
 
-      // Continue loop
       if (!gameOver) anim = requestAnimationFrame(gameTick);
     }
 
@@ -297,7 +334,7 @@ function App() {
       if (anim) cancelAnimationFrame(anim);
     };
     // eslint-disable-next-line
-  }, [gamestate, running, player, bots, flag, dropoffBox, level]);
+  }, [gamestate, running, player, bots, flag, dropoffBox, level, obstacles]);
 
   // Draw canvas game area
   useEffect(() => {
@@ -323,6 +360,29 @@ function App() {
     ctx.fillStyle = "#f9e7e7";
     ctx.fill();
 
+    // --- Draw Obstacles ---
+    obstacles.forEach((o) => {
+      ctx.save();
+      ctx.globalAlpha = 0.86;
+      ctx.beginPath();
+      ctx.rect(
+        o.x - OBSTACLE_SIZE / 2,
+        o.y - OBSTACLE_SIZE / 2,
+        OBSTACLE_SIZE,
+        OBSTACLE_SIZE
+      );
+      ctx.fillStyle = "#b38816";
+      ctx.shadowColor = "#91710355";
+      ctx.shadowBlur = 6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2.1;
+      ctx.strokeStyle = "#85641d";
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+
     // Drop-off box (draw only if active)
     if (dropoffBox) {
       ctx.save();
@@ -343,7 +403,6 @@ function App() {
       ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Draw label
       ctx.font = "bold 14px Arial";
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
@@ -423,7 +482,9 @@ function App() {
     // Bots can no longer hold the flag, so don't display flag on bots.
 
     // UI overlays: if over, draw winner
-    if (gamestate === "over" || winner) {
+    if (
+      gamestate === "over" || winner
+    ) {
       ctx.save();
       ctx.globalAlpha = 0.79;
       ctx.fillStyle = "#fff";
@@ -446,9 +507,24 @@ function App() {
       ctx.fillStyle = "#444";
       ctx.fillText("Press Restart to play again!", CANVAS_W / 2, CANVAS_H / 2 + 32);
       ctx.restore();
+    } else if (levelCompleted) {
+      // Draw "Level Completed" overlay with Continue button
+      ctx.save();
+      ctx.globalAlpha = 0.87;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(CANVAS_W/2-130, CANVAS_H/2-70, 260, 130);
+      ctx.globalAlpha = 1;
+      ctx.font = "bold 26px Segoe UI";
+      ctx.fillStyle = "#222";
+      ctx.textAlign = "center";
+      ctx.fillText(`Level ${level} Complete!`, CANVAS_W/2, CANVAS_H/2 - 6);
+      ctx.font = "18px Arial";
+      ctx.fillStyle = "#43a047";
+      ctx.fillText("Congratulations! Continue to next level.", CANVAS_W/2, CANVAS_H/2 + 27);
+      ctx.restore();
     }
     // eslint-disable-next-line
-  }, [player, bots, flag, gamestate, winner, dropoffBox]);
+  }, [player, bots, flag, gamestate, winner, dropoffBox, obstacles, levelCompleted]);
 
   // Button actions
   const handleStart = () => {
@@ -467,9 +543,12 @@ function App() {
 
   // Pass autoStart=true for hotkey restart-and-autostart
   const handleRestart = (autoStart = false) => {
+    // Always reset obstacles for first level, and bots
+    setObstacles(randomObstacles(0));
+    setNumBots(BASE_NUM_BOTS);
     setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
     setBots(
-      Array.from({ length: NUM_BOTS }, (_, idx) => ({
+      Array.from({ length: BASE_NUM_BOTS }, (_, idx) => ({
         id: idx + 1,
         x: CANVAS_W - 50 - idx * 30,
         y: 2 * CANVAS_H / 3 - idx * 30,
@@ -483,7 +562,7 @@ function App() {
     setTimer(120);
     setWinner(null);
     setMessage("");
-    // Reset level to 1 (for future level progression, could preserve level on restart if going to next stage)
+    setLevelCompleted(false);
     setLevel(1);
     keyState.current = {};
     if (autoStart) {
@@ -494,6 +573,38 @@ function App() {
       setRunning(false);
     }
   };
+
+  // Handle continue to next level after level-completed UI
+  const handleContinueLevel = useCallback(() => {
+    // Advance to next level!
+    const nextLevel = level + 1;
+    const newNumBots = BASE_NUM_BOTS + (nextLevel-1) * BOT_INCREASE_RATE;
+    const newObstacles = randomObstacles((nextLevel-1) * OBSTACLE_INCREASE_RATE);
+    setLevel(nextLevel);
+    setNumBots(newNumBots);
+    setObstacles(newObstacles);
+
+    setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
+    setBots(
+      Array.from({ length: newNumBots }, (_, idx) => ({
+        id: idx + 1,
+        x: CANVAS_W - 50 - idx * 30,
+        y: 2 * CANVAS_H / 3 - idx * 30,
+        dx: 0,
+        dy: 0,
+        score: 0,
+      }))
+    );
+    setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
+    setDropoffBox(null);
+    setTimer(120);
+    setWinner(null);
+    setMessage("");
+    setLevelCompleted(false);
+    setGamestate("running");
+    setRunning(true);
+    keyState.current = {};
+  }, [level]);
 
   // Format timer mm:ss
   const pad = (n) => String(n).padStart(2, "0");
@@ -630,6 +741,27 @@ function App() {
             }}
             aria-label="Game Canvas"
           />
+          {/* Overlay absolute continue button for level completed */}
+          {levelCompleted && (
+            <button
+              className="game-btn"
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: "18%",
+                transform: "translateX(-50%)",
+                fontSize: "1.25rem",
+                padding: "15px 48px",
+                zIndex: 23,
+                background: "#43a047"
+              }}
+              onClick={handleContinueLevel}
+              tabIndex={0}
+              aria-label="Continue to Next Level"
+            >
+              Continue
+            </button>
+          )}
         </div>
         {/* ---- Control Buttons ---- */}
         <div
@@ -642,7 +774,7 @@ function App() {
             className="game-btn"
             tabIndex={0}
             onClick={handleStart}
-            disabled={gamestate === "running"}
+            disabled={gamestate === "running" || levelCompleted}
             aria-label="Start Game"
           >
             {gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume"}
@@ -669,11 +801,11 @@ function App() {
           <span>
             Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move. Grab the flag, then find the drop-off box to score!<br />
             Opposing bots will compete for the flag!<br />
-            {/* Future: Levels will include more obstacles & harder bots. */}
+            Earn 3 points to clear the level. Levels get harder!<br/>
           </span>
         </div>
         <div style={{ marginTop: "0.7rem", color: "#bbb", fontSize: 13 }}>
-          Level: {level}
+          Level: {level} &nbsp;|&nbsp; Bots: {numBots} &nbsp;|&nbsp; Obstacles: {obstacles.length}
         </div>
       </main>
     </div>
