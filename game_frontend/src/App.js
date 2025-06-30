@@ -36,8 +36,10 @@ function randomPos(w, h, margin = 18) {
 function App() {
   // Game state
   const [player, setPlayer] = useState({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
+  // Assign unique IDs to each bot to reliably track "heldBy"
   const [bots, setBots] = useState(() =>
     Array.from({ length: NUM_BOTS }, (_, idx) => ({
+      id: idx + 1,
       x: CANVAS_W - 50 - idx * 30,
       y: 2 * CANVAS_H / 3 - idx * 30,
       dx: 0,
@@ -71,14 +73,18 @@ function App() {
     return () => clearInterval(t);
   }, [running, timer]);
 
-  // Keyboard controls: WASD and Arrow keys
+  // Keyboard controls: WASD, Arrow keys, and 'r' for restart/autostart
   useEffect(() => {
     function handleDown(e) {
-      if (!running) return;
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
+
+      // Handle 'r' to restart and immediately start game
+      if (e.key === "r" || e.key === "R") {
+        handleRestart(true); // pass true to trigger autostart
+      }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -92,7 +98,9 @@ function App() {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
     };
-  }, [running]);
+    // NB: intentionally left [] for proper hotkey listening.
+    // eslint-disable-next-line
+  }, []);
 
     // Main game loop (fixed timestep; updating state and drawing)
   useEffect(() => {
@@ -124,7 +132,7 @@ function App() {
       // Bots: move towards flag (if not holding), else toward home
       let newBots = bots.map((bot, i) => {
         let target =
-          flag.heldBy === bot
+          flag.heldBy === `bot:${bot.id}`
             ? { x: CANVAS_W - 36, y: CANVAS_H / 2 }
             : flag.heldBy === null
               ? flag
@@ -150,8 +158,6 @@ function App() {
 
       // Check flag pickup/drop for player and bots
       let newFlag = { ...flag };
-      let playerHasFlag = flag.heldBy === "player";
-      let botHoldingIdx = bots.findIndex((bot, i) => flag.heldBy === bot);
 
       // Player pickup flag (if not held)
       if (
@@ -167,7 +173,7 @@ function App() {
           !flag.heldBy &&
           dist(bot.x, bot.y, flag.x, flag.y) < (BOT_SIZE + FLAG_SIZE) / 2 + 2
         ) {
-          newFlag.heldBy = bot;
+          newFlag.heldBy = `bot:${bot.id}`;
           newFlag.home = false;
         }
       });
@@ -194,7 +200,7 @@ function App() {
       let botScored = -1;
       bots.forEach((bot, i) => {
         if (
-          newFlag.heldBy === bot &&
+          newFlag.heldBy === `bot:${bot.id}` &&
           bot.x > CANVAS_W - FLAG_ZONE_RADIUS - BOT_SIZE / 2
         ) {
           botScored = i;
@@ -231,11 +237,12 @@ function App() {
           newFlag.x = px;
           newFlag.y = py;
         } else if (
-          typeof newFlag.heldBy === "object" &&
-          newFlag.heldBy !== null
+          typeof newFlag.heldBy === "string" &&
+          newFlag.heldBy.startsWith("bot:")
         ) {
-          // Find which bot is holding
-          let idx = updatedBots.findIndex((b) => b === newFlag.heldBy);
+          // Find which bot is holding by id
+          let botId = parseInt(newFlag.heldBy.split(":")[1]);
+          let idx = updatedBots.findIndex((b) => b.id === botId);
           if (idx !== -1) {
             newFlag.x = updatedBots[idx].x;
             newFlag.y = updatedBots[idx].y;
@@ -376,10 +383,11 @@ function App() {
       ctx.font = "900 15px Segoe UI, Arial";
       ctx.fillStyle = "#2196f3";
       ctx.fillText("🏳️", player.x, player.y + 5);
-    } else if (flag.heldBy && typeof flag.heldBy === "object") {
+    } else if (flag.heldBy && typeof flag.heldBy === "string" && flag.heldBy.startsWith("bot:")) {
       // Find which bot
+      const botId = parseInt(flag.heldBy.split(":")[1]);
       bots.forEach((bot, i) => {
-        if (bot === flag.heldBy) {
+        if (bot.id === botId) {
           ctx.font = "900 16px Arial";
           ctx.fillStyle = "#e75266";
           ctx.fillText("🏳️", bot.x, bot.y + 4);
@@ -429,10 +437,12 @@ function App() {
     setRunning(false);
   };
 
-  const handleRestart = () => {
+  // Pass autoStart=true for hotkey restart-and-autostart
+  const handleRestart = (autoStart = false) => {
     setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
     setBots(
       Array.from({ length: NUM_BOTS }, (_, idx) => ({
+        id: idx + 1,
         x: CANVAS_W - 50 - idx * 30,
         y: 2 * CANVAS_H / 3 - idx * 30,
         dx: 0,
@@ -442,10 +452,15 @@ function App() {
     );
     setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
     setTimer(120);
-    setGamestate("ready");
-    setRunning(false);
     setWinner(null);
     keyState.current = {};
+    if (autoStart) {
+      setGamestate("running");
+      setRunning(true);
+    } else {
+      setGamestate("ready");
+      setRunning(false);
+    }
   };
 
   // Format timer mm:ss
@@ -455,7 +470,7 @@ function App() {
   // Who has flag
   let flagStatus = "Safe";
   if (flag.heldBy === "player") flagStatus = "You";
-  else if (flag.heldBy && typeof flag.heldBy === "object") flagStatus = "Opponent";
+  else if (flag.heldBy && typeof flag.heldBy === "string" && flag.heldBy.startsWith("bot:")) flagStatus = "Opponent";
 
   // First bot with highest score for display
   const oppScore = Math.max(...bots.map((b) => b.score));
@@ -589,7 +604,7 @@ function App() {
           <button
             className="game-btn"
             tabIndex={0}
-            onClick={handleRestart}
+            onClick={() => handleRestart(false)}
             aria-label="Restart Game"
           >
             Restart
