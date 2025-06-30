@@ -1277,7 +1277,7 @@ function App() {
               </div>
               <button
                 className="game-btn continue-btn"
-                onClick={() => handleRestart(false)}
+                onClick={() => handleRestart(true)}
                 tabIndex={0}
                 aria-label="Restart Game"
               >
@@ -1347,7 +1347,7 @@ function App() {
           <button
             className="game-btn"
             tabIndex={0}
-            onClick={() => handleRestart(false)}
+            onClick={() => handleRestart(true)}
             aria-label="Restart Game"
           >
             Restart
