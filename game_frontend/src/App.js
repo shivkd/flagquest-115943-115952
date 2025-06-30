@@ -8,7 +8,9 @@ import "./App.css";
  * - Ensures smooth, reliable controls for both player and bots.
  */
 
-// Game area and entity constants
+/********************
+ * HAZARD CONSTANTS
+ ********************/
 const CANVAS_W = 640;
 const CANVAS_H = 440;
 const PLAYER_SIZE = 26;
@@ -26,6 +28,18 @@ const BOT_INCREASE_RATE = 1;
 const OBSTACLE_INCREASE_RATE = 1;
 const BASE_NUM_BOTS = 2;
 const OBSTACLE_SIZE = 28;
+
+// Bomb and Laser Hazards
+const BOMB_MIN_DELAY = 900; // ms until spawn or explosion
+const BOMB_MAX_DELAY = 2400;
+const BOMB_RADIUS = 34; // blast radius
+const BOMB_WARNING_RADIUS = BOMB_RADIUS + 8;
+const BOMB_EXPLODE_DURATION = 20; // frames for explosion
+const LASER_WIDTH = 19;
+const LASER_WARNING_TIME = 70; // frames before laser fires
+const LASER_FIRE_TIME = 44; // frames laser active
+const LASER_VARIANT_COLORS = ["#f25266", "#f5fd36", "#36ffd2"];
+const LASER_WARNING_COLOR = "#ffe983";
 
 // Utility helpers
 function clamp(value, min, max) {
@@ -72,7 +86,10 @@ function randomObstacles(numObstacles = 0) {
   return obs;
 }
 
-// PUBLIC_INTERFACE
+/**
+ * PUBLIC_INTERFACE
+ * Main game component. Adds hazard state and hazard management.
+ */
 function App() {
   // Game state
   const [level, setLevel] = useState(1);
@@ -103,6 +120,13 @@ function App() {
     home: true,
   }));
   const [dropoffBox, setDropoffBox] = useState(null);
+
+  /****** Hazard environment (bombs & lasers) *****/
+  const [bombs, setBombs] = useState([]);
+  const [lasers, setLasers] = useState([]);
+  // State for timing the next spawn (so hazard timing isn't frame-dependent)
+  const bombNextTimerRef = useRef(0);
+  const laserNextTimerRef = useRef(0);
 
   // Timer/game state
   const TIMER_DURATION = 90;
@@ -171,12 +195,17 @@ function App() {
   const botsRef = useRef(null);
   const flagRef = useRef(null);
   const dropoffBoxRef = useRef(null);
+  // Hazard refs
+  const bombsRef = useRef(null);
+  const lasersRef = useRef(null);
 
   // Keep refs in sync with state
   useEffect(() => { playerRef.current = player; }, [player]);
   useEffect(() => { botsRef.current = bots; }, [bots]);
   useEffect(() => { flagRef.current = flag; }, [flag]);
   useEffect(() => { dropoffBoxRef.current = dropoffBox; }, [dropoffBox]);
+  useEffect(() => { bombsRef.current = bombs; }, [bombs]);
+  useEffect(() => { lasersRef.current = lasers; }, [lasers]);
 
   useEffect(() => {
     let anim;
@@ -195,24 +224,30 @@ function App() {
       return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
     }
 
+    /**
+     * Main game loop. Adds bombs and lasers spawn/progression/collision starting from level >= 2.
+     */
     function gameTick(now) {
       if (gamestate !== "running") return;
 
       let delta = Math.min(now - lastTime, 40);
       lastTime = now;
 
-      // --- Use refs for world state in animation frame ---
+      // --- refs for state ---
       let p = playerRef.current ? { ...playerRef.current } : { ...player };
       let botsArr = botsRef.current ? botsRef.current.map((b) => ({ ...b })) : bots.map((b) => ({ ...b }));
       let flagVal = flagRef.current ? { ...flagRef.current } : { ...flag };
       let box = dropoffBoxRef.current ? { ...dropoffBoxRef.current } : dropoffBox;
+      let bombsArr = bombsRef.current ? bombsRef.current.map((b) => ({...b})) : [];
+      let lasersArr = lasersRef.current ? lasersRef.current.map(l => ({...l})) : [];
 
-      // ----- PLAYER PHYSICS -----
+      // ----- PLAYER PHYSICS (identical, unless stunned by hazards) -----
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
       if (keyState.current.down) pvy += PLAYER_SPEED;
       if (keyState.current.left) pvx -= PLAYER_SPEED;
       if (keyState.current.right) pvx += PLAYER_SPEED;
+      // No core movement block - hazard effects below!
 
       if (pvx !== 0 || pvy !== 0) {
         const m = Math.sqrt(pvx * pvx + pvy * pvy);
@@ -223,7 +258,6 @@ function App() {
       }
       let newPx = clamp(p.x + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
       let newPy = clamp(p.y + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
-      // Obstacle collision: only move if not blocked
       if (!checkCollisionWithObstacles(newPx, newPy)) {
         p.x = newPx;
         p.y = newPy;
@@ -235,21 +269,13 @@ function App() {
         BOT_SPEED_CAP
       );
 
-      // ----- Bots: Move toward player with randomized/separated trajectories -----
+      // ----- Bots movement, similar as before -----
       let botsAfterMove = botsArr.map((bot, i) => {
-        // Each bot is given a (pseudo)unique "chase offset" based on their index and minor randomness
-        // so that the bots don't all path towards (player.x, player.y) exactly.
-        // This biases paths with a small offset, producing separation and staggered pursuit.
         const botChaseAngleBase = Math.atan2(p.y - bot.y, p.x - bot.x);
-
-        // Angle deviation: each bot receives a base offset (spread over [-20°, +20°]) plus frame random
-        const indexSpread = ((i - (botsArr.length - 1) / 2) * Math.PI) / (botsArr.length * 3.3); // spread = ~±17°
-        const randomWobble = (Math.random() - 0.5) * 0.18; // random add ±0.09 rad ≈±5°, per update
+        const indexSpread = ((i - (botsArr.length - 1) / 2) * Math.PI) / (botsArr.length * 3.3);
+        const randomWobble = (Math.random() - 0.5) * 0.18;
         const chaseAngle = botChaseAngleBase + indexSpread + randomWobble;
-
-        // Slight distance variation: makes them "orbit" at different radii if stacked
         const biasDist = 2.5 + 2 * Math.abs(indexSpread) + Math.random() * 1.2;
-
         let dx = Math.cos(chaseAngle) * (Math.abs(p.x - bot.x) + biasDist);
         let dy = Math.sin(chaseAngle) * (Math.abs(p.y - bot.y) + biasDist);
 
@@ -258,10 +284,8 @@ function App() {
         if (distToTgt > 3) {
           bvx = (dx / distToTgt) * currentBotSpeed;
           bvy = (dy / distToTgt) * currentBotSpeed;
-          // Try full move, then just x, then just y; fallback: don't move
           let maybeBx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
           let maybeBy = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
-          // Try to avoid moving "into" another bot's exact spot (separation logic)
           const separationThreshold = BOT_SIZE * 0.84;
           let willStack = botsArr.some(
             (other, j) =>
@@ -289,8 +313,187 @@ function App() {
         return { ...bot };
       });
 
+      // --------
+      // HAZARD SPAWN/PROGRESSION -- Only from level >= 2!
+      // --------
+      // Bomb spawn: appears at intervals, explodes after delay, deals "damage"
+      // Laser: strong horizontal or vertical beam (with warning), sweeps occasionally
+      let bombsNext = bombsArr;
+      let lasersNext = lasersArr;
+
+      // Scales with difficulty
+      const bombSpawnInterval = Math.max(120 + 700 / Math.max(1, level - 1), 80); // ms
+      const bombLiveDuration = 1000 + 1350 / Math.max(1, level - 1); // ms till explosion
+      const maxBombs = Math.max(1, Math.floor(level / 1.18));
+      const laserSpawnIntervalFrames = 350 - 35 * Math.min(level-2,6); // in frames, faster for higher level
+      const laserWarningFrames = Math.max(30, LASER_WARNING_TIME - 5 * (level-2));
+      const maxLasers = Math.max(1, Math.floor((level-1)/2));
+
+      // Use frame-counting for laser, timer for bomb (both robust for their spawn style and animation)
+      // Bombs
+      if (level >= 2 && !playerScored) {
+        // Count time: only one spawn per timer expiry
+        bombNextTimerRef.current -= delta;
+        if (bombNextTimerRef.current <= 0 && bombsNext.length < maxBombs) {
+          // spawn bomb at random safe spot (not overlapping player, bots, or flag)
+          let spawn;
+          let tries = 0;
+          do {
+            spawn = randomPos(CANVAS_W, CANVAS_H, 32);
+            tries++;
+          } while (
+            tries < 16 &&
+            (
+              (Math.abs(spawn.x - p.x) < PLAYER_SIZE * 1.6 && Math.abs(spawn.y - p.y) < PLAYER_SIZE * 1.6) ||
+              botsArr.some(bot => Math.abs(spawn.x - bot.x) < BOT_SIZE * 1.6 && Math.abs(spawn.y - bot.y) < BOT_SIZE * 1.6) ||
+              (flagVal.heldBy == null && Math.abs(spawn.x - flagVal.x) < FLAG_SIZE * 2 && Math.abs(spawn.y - flagVal.y) < FLAG_SIZE * 2) ||
+              checkCollisionWithObstacles(spawn.x, spawn.y, 16)
+            )
+          );
+          // Bomb properties: x,y, spawnTime, willExplodeAt, exploded
+          bombsNext = [
+            ...bombsNext,
+            {
+              id: Math.random().toString(36).slice(2),
+              x: spawn.x,
+              y: spawn.y,
+              created: performance.now(),
+              liveUntil: performance.now() + bombLiveDuration,
+              exploded: false,
+              explosionProgress: 0,
+            },
+          ];
+          bombNextTimerRef.current = randomBetween(bombSpawnInterval, bombSpawnInterval * 1.7);
+        }
+        // Progress bombs: explode after timer, remove after
+        bombsNext = bombsNext.map(bomb => {
+          if (!bomb.exploded && performance.now() >= bomb.liveUntil) {
+            return { ...bomb, exploded: true, explosionProgress: 1 };
+          }
+          if (bomb.exploded && bomb.explosionProgress < BOMB_EXPLODE_DURATION) {
+            return { ...bomb, explosionProgress: bomb.explosionProgress + 1 };
+          }
+          return bomb;
+        });
+        // Remove bombs whose animation has completed
+        bombsNext = bombsNext.filter(bomb => !bomb.exploded || bomb.explosionProgress < BOMB_EXPLODE_DURATION);
+      } else if (level < 2) {
+        bombsNext = [];
+        bombNextTimerRef.current = 0;
+      }
+
+      // Lasers: appear less frequently, sweep all at once
+      if (level >= 2 && !playerScored) {
+        laserNextTimerRef.current -= 1;
+        if (laserNextTimerRef.current <= 0 && lasersNext.length < maxLasers) {
+          // spawn horizontal or vertical laser (random)
+          let isHorizontal = Math.random() > 0.5;
+          let pos = isHorizontal
+            ? randomBetween(70, CANVAS_H - 70)
+            : randomBetween(70, CANVAS_W - 70);
+          lasersNext = [
+            ...lasersNext,
+            {
+              id: Math.random().toString(36).slice(2),
+              isHorizontal,
+              pos,
+              warning: true,
+              lifetime: 0, // frames
+              color: LASER_VARIANT_COLORS[Math.floor(Math.random() * LASER_VARIANT_COLORS.length)],
+            },
+          ];
+          laserNextTimerRef.current = randomBetween(
+            laserSpawnIntervalFrames * 0.88,
+            laserSpawnIntervalFrames * 1.22
+          );
+        }
+        // Progress lasers: warning, fire, then disappear
+        lasersNext = lasersNext.map(laser => {
+          let nextLife = laser.lifetime + 1;
+          if (laser.warning && nextLife >= laserWarningFrames) {
+            return { ...laser, warning: false, lifetime: nextLife };
+          }
+          if (!laser.warning && nextLife >= laserWarningFrames + LASER_FIRE_TIME) {
+            return null;
+          }
+          return { ...laser, lifetime: nextLife };
+        }).filter(Boolean);
+      } else if (level < 2) {
+        lasersNext = [];
+        laserNextTimerRef.current = 0;
+      }
+
+      // Collision checks/effects
+      let bombDamage = false;
+      for (const bomb of bombsNext) {
+        // Only for "exploded" bomb, frame 1 of explosion
+        if (
+          bomb.exploded &&
+          bomb.explosionProgress === 1 &&
+          dist(p.x, p.y, bomb.x, bomb.y) < BOMB_RADIUS + PLAYER_SIZE / 2
+        ) {
+          bombDamage = true;
+        }
+        botsAfterMove.forEach((bot, idx) => {
+          if (
+            bomb.exploded &&
+            bomb.explosionProgress === 1 &&
+            dist(bot.x, bot.y, bomb.x, bomb.y) < BOMB_RADIUS + BOT_SIZE / 2
+          ) {
+            // Remove bot, respawn at far edge (simulate "damage")
+            botsAfterMove[idx] = {
+              ...bot,
+              x: CANVAS_W - 30,
+              y: randomBetween(40, CANVAS_H - 40),
+            };
+          }
+        });
+      }
+      let laserDamage = false;
+      for (const laser of lasersNext) {
+        if (!laser.warning && laser.lifetime >= laserWarningFrames) {
+          if (laser.isHorizontal) {
+            // Check if player is in laser
+            if (Math.abs(p.y - laser.pos) < LASER_WIDTH / 2 + PLAYER_SIZE / 2) {
+              laserDamage = true;
+            }
+            botsAfterMove.forEach((bot, idx) => {
+              if (Math.abs(bot.y - laser.pos) < LASER_WIDTH / 2 + BOT_SIZE / 2) {
+                botsAfterMove[idx] = {
+                  ...bot,
+                  x: randomBetween(CANVAS_W / 3, CANVAS_W - 30),
+                  y: 30 + Math.random() * (CANVAS_H - 60),
+                };
+              }
+            });
+          } else {
+            if (Math.abs(p.x - laser.pos) < LASER_WIDTH / 2 + PLAYER_SIZE / 2) {
+              laserDamage = true;
+            }
+            botsAfterMove.forEach((bot, idx) => {
+              if (Math.abs(bot.x - laser.pos) < LASER_WIDTH / 2 + BOT_SIZE / 2) {
+                botsAfterMove[idx] = {
+                  ...bot,
+                  x: 60,
+                  y: randomBetween(30, CANVAS_H - 30),
+                };
+              }
+            });
+          }
+        }
+      }
+      let gameOverByHazard = false;
+      let hazardMsg = "";
+      if (bombDamage) {
+        gameOverByHazard = true;
+        hazardMsg = "You were blown up by a bomb!";
+      }
+      if (laserDamage) {
+        gameOverByHazard = true;
+        hazardMsg = "You were vaporized by a laser!";
+      }
+
       // ----- FLAG PICKUP LOGIC -----
-      // Show new dropoff box exactly once per pickup (and if flag not held by player)
       let flagNext = { ...flagVal };
       let dropoffCreated = false;
       if (
@@ -321,7 +524,7 @@ function App() {
         playerScored = true;
       }
 
-      let playerObj = { ...p };   // preserve only position here
+      let playerObj = { ...p };
       let botsOut = botsAfterMove.map((b) => ({ ...b }));
       let playerScoreNext = playerRef.current ? playerRef.current.score : player.score;
       let botScoresArr = botsRef.current ? botsRef.current.map((b) => b.score) : bots.map((b) => b.score);
@@ -329,7 +532,7 @@ function App() {
       // Update scores
       if (playerScored) {
         playerScoreNext += level;
-        box = null; // hide dropoff!
+        box = null;
       } else {
         if (flagNext.heldBy === "player") {
           flagNext.x = p.x;
@@ -337,7 +540,7 @@ function App() {
         }
       }
 
-      // Check win/lose/gameover
+      // Check win/lose/gameover/hazard loss
       let gameOver = false;
       let newWinner = null;
       let endMsg = "";
@@ -345,6 +548,11 @@ function App() {
         gameOver = true;
         newWinner = "bot";
         endMsg = "You were caught by a bot!";
+      }
+      if (gameOverByHazard) {
+        gameOver = true;
+        newWinner = "bot";
+        endMsg = hazardMsg;
       }
       if (playerScored) {
         setLevelCompleted(true);
@@ -356,6 +564,8 @@ function App() {
         setBots((prev) => botsOut.map((b, i) => ({ ...b, score: botScoresArr[i] })));
         setFlag(flagNext);
         setDropoffBox(null);
+        setBombs([]);
+        setLasers([]);
         return;
       }
       if (Math.max(...botScoresArr) >= 3) {
@@ -369,14 +579,17 @@ function App() {
         setWinner(newWinner);
         setMessage(endMsg);
         setDropoffBox(null);
+        setBombs([]);
+        setLasers([]);
       } else {
         setMessage("");
+        setBombs(bombsNext);
+        setLasers(lasersNext);
       }
 
-      // Write world state back to React
       setPlayer((prev) => ({
         ...playerObj,
-        score: playerScoreNext // preserve highest up-to-date score
+        score: playerScoreNext
       }));
       setBots((prev) => botsOut.map((b, i) => ({
         ...b,
@@ -402,7 +615,7 @@ function App() {
     // eslint-disable-next-line
   }, [gamestate, obstacles, level]);
 
-  // --- DRAW: Core canvas rendering only, NO hazard visuals ---
+  // --- DRAW: Now renders bombs and lasers along with core visuals ---
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -411,6 +624,105 @@ function App() {
 
     ctx.fillStyle = "#e3eaf7";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Bombs/Lasers (level >= 2 only)
+    if (level >= 2) {
+      // Draw bombs (show fuse, warning circle, explosion)
+      bombs.forEach((bomb) => {
+        ctx.save();
+        if (!bomb.exploded) {
+          // Fuse circle
+          ctx.globalAlpha = 0.93;
+          ctx.beginPath();
+          ctx.arc(bomb.x, bomb.y, 16, 0, 2 * Math.PI);
+          ctx.fillStyle = "#ffd57e";
+          ctx.shadowColor = "#ff6b01";
+          ctx.shadowBlur = 7;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          // Pulsing warning outline
+          ctx.lineWidth = 3.2 + Math.sin(performance.now() / 160) * 1.8;
+          ctx.strokeStyle = "#ff9800";
+          ctx.globalAlpha = 0.72 + 0.22 * Math.abs(Math.sin(performance.now() / 120 + bomb.x / 33));
+          ctx.beginPath();
+          ctx.arc(bomb.x, bomb.y, BOMB_WARNING_RADIUS, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.beginPath();
+          ctx.arc(bomb.x, bomb.y, 6, 0, 2 * Math.PI);
+          ctx.fillStyle = "#222";
+          ctx.fill();
+        } else {
+          // Explosion animation
+          ctx.globalAlpha =
+            0.14 + 0.7 * (1 - bomb.explosionProgress / (BOMB_EXPLODE_DURATION - 1));
+          ctx.beginPath();
+          ctx.arc(bomb.x, bomb.y,
+            BOMB_RADIUS + 12 * (1 - bomb.explosionProgress / BOMB_EXPLODE_DURATION),
+            0, 2 * Math.PI
+          );
+          ctx.fillStyle = "#ffefbb";
+          ctx.shadowColor = "#ff9800";
+          ctx.shadowBlur = 13 + 20 * (1 - bomb.explosionProgress / BOMB_EXPLODE_DURATION);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.globalAlpha = 1;
+          ctx.arc(bomb.x, bomb.y, BOMB_RADIUS, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#f25266";
+          ctx.lineWidth = 5.6;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+        ctx.restore();
+        // Label - fade out on explode
+        ctx.save();
+        ctx.font = "bold 13px Segoe UI";
+        ctx.fillStyle = "#ff9800";
+        ctx.globalAlpha = bomb.exploded ? 0.4 : 1;
+        ctx.textAlign = "center";
+        ctx.fillText(bomb.exploded ? "BOOM!" : "💣", bomb.x, bomb.y + 5);
+        ctx.restore();
+      });
+      // Draw lasers
+      lasers.forEach((laser) => {
+        ctx.save();
+        ctx.globalAlpha = laser.warning
+          ? 0.75 + 0.21 * Math.sin(performance.now() / 150)
+          : 0.68 + 0.23 * Math.sin(performance.now() / 180);
+        ctx.lineWidth = LASER_WIDTH;
+        ctx.strokeStyle = laser.warning ? LASER_WARNING_COLOR : laser.color;
+        ctx.shadowColor = laser.warning ? "#ffeccb" : laser.color + "77";
+        ctx.shadowBlur = laser.warning ? 10 : 21;
+        ctx.beginPath();
+        if (laser.isHorizontal) {
+          ctx.moveTo(6, laser.pos);
+          ctx.lineTo(CANVAS_W - 6, laser.pos);
+        } else {
+          ctx.moveTo(laser.pos, 6);
+          ctx.lineTo(laser.pos, CANVAS_H - 6);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        // Label
+        if (laser.warning) {
+          ctx.save();
+          ctx.font = "bold 12.7px Segoe UI";
+          ctx.fillStyle = "#ffe466";
+          ctx.textAlign = "center";
+          if (laser.isHorizontal) {
+            ctx.fillText("LASER", CANVAS_W / 2, laser.pos - 13);
+          } else {
+            ctx.save();
+            ctx.translate(laser.pos - 23, CANVAS_H / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText("LASER", 0, 0);
+            ctx.restore();
+          }
+          ctx.restore();
+        }
+        ctx.restore();
+      });
+    }
 
     // Left zone (player base)
     ctx.beginPath();
@@ -719,6 +1031,10 @@ function App() {
       setMessage("");
       setLevelCompleted(false);
       setLevel(1);
+      setBombs([]); // clear hazards on restart
+      setLasers([]);
+      bombNextTimerRef.current = 0;
+      laserNextTimerRef.current = 0;
       keyState.current = {};
       if (autoStart) {
         setGamestate("running");
@@ -760,6 +1076,10 @@ function App() {
     setLevelCompleted(false);
     setGamestate("running");
     setRunning(true);
+    setBombs([]); // clear hazards for new level
+    setLasers([]);
+    bombNextTimerRef.current = 0;
+    laserNextTimerRef.current = 0;
     keyState.current = {};
     // Focus the panel ref after new level starts
     setTimeout(() => {
