@@ -638,88 +638,62 @@ function App() {
           FlagQuest
         </h1>
       </header>
-      <section
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "2rem",
-          background: "var(--bg-secondary)",
-          borderBottom: "1px solid var(--border-color)",
-          padding: "1rem 0",
-        }}
-      >
-        <div style={{ fontWeight: 500 }}>
+      {/* --- AAA Scoreboard --- */}
+      <section>
+        <div>
           Score:{" "}
-          <span style={{ color: "var(--primary)", fontWeight: 700 }}>
+          <span style={{ color: "var(--primary)", textShadow: "0 2px 8px #64baff88" }}>
             {player.score}
           </span>
         </div>
-        <div style={{ fontWeight: 500 }}>
+        <div>
           Opponent:{" "}
-          <span style={{ color: "var(--secondary)", fontWeight: 700 }}>
+          <span style={{ color: "var(--secondary)", textShadow: "0 2px 9px #36ff8967" }}>
             {oppScore}
           </span>
         </div>
-        <div style={{ fontWeight: 500 }}>
+        <div>
           Timer:{" "}
-          <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+          <span style={{
+            color: "#ffd57e",
+            background: "var(--timer-bg)",
+            boxShadow: "0 1.5px 10px 2px #ffb02127",
+            borderRadius: "7.5px",
+            padding: "4.5px 18px",
+            fontFamily: "'Orbitron', 'Exo', monospace",
+            letterSpacing: "0.08em",
+            fontWeight: 800,
+            fontSize: "1.09em",
+            border: "1.3px solid var(--panel-outline)"
+          }}>
             {timerStr}
           </span>
         </div>
-        <div style={{ fontWeight: 500 }}>
+        <div>
           Flag:{" "}
-          <span style={{ color: "var(--secondary)", fontWeight: 700 }}>
+          <span style={{ color: "#ffd37d", filter: "drop-shadow(0 0 4px #ffb02193)" }}>
             {flagStatus}
           </span>
         </div>
       </section>
       {dropoffStatus && (
-        <div
-          style={{
-            marginTop: ".8rem",
-            textAlign: "center",
-            color: "#43a047",
-            fontSize: 17,
-            fontWeight: 600,
-            letterSpacing: "0.014em",
-            minHeight: 25,
-          }}
-        >
+        <div className="game-message">
           {dropoffStatus}
         </div>
       )}
 
-      <main
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          marginTop: "2.5rem",
-          marginBottom: "2.5rem",
-        }}
-      >
-        {/* ---- Central Game Area (canvas) ---- */}
+      <main>
+        {/* ---- Central Game Area (canvas with AAA panel) ---- */}
         <div
-          style={{
-            width: `${CANVAS_W}px`,
-            height: `${CANVAS_H}px`,
-            background: "var(--bg-secondary)",
-            border: "2.5px solid var(--border-color)",
-            borderRadius: "18px",
-            boxShadow: "0 5px 16px 2px #e9ecef55",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: "2.3rem",
-            maxWidth: "95vw",
-            position: "relative",
-            outline: "none",
-          }}
+          className="game-canvas-panel"
           tabIndex={0}
           aria-label="Game Area"
           onFocus={() => {
-            // Focus event can be used to allow for keyboard hotkeys
+            // Allow for keyboard hotkeys if needed
+          }}
+          style={{
+            width: `${CANVAS_W + 30}px`,
+            height: `${CANVAS_H + 40}px`
           }}
         >
           <canvas
@@ -731,42 +705,59 @@ function App() {
               background: "none",
               outline: "none",
               border: "none",
-              width: "100%",
-              height: "100%",
+              width: `${CANVAS_W}px`,
+              height: `${CANVAS_H}px`,
               display: "block",
               borderRadius: "15px",
+              boxShadow: "0 0 0 2px var(--accent), 0 2.5px 38px #2b314259",
+              zIndex: 6,
+              marginTop: "20px"
             }}
             aria-label="Game Canvas"
           />
-          {/* Overlay absolute continue button for level completed */}
+
+          {/* Overlay Victory/Defeat or Level Complete */}
+          {(gamestate === "over" || winner) && (
+            <div className={`game-overlay-panel ${winner === "player" ? "victory" : "defeat"}`} tabIndex={0}>
+              <h2>
+                {winner === "player" ? "You Win! 🎉" : winner === "bot" ? "Bots Win! 🤖" : "Game Over"}
+              </h2>
+              <div className="desc">
+                {message || (winner === "player"
+                  ? "Legendary moves! Next time, try with more bots!"
+                  : winner === "bot" ? "Bots outsmarted you this round!" : "Try again!")}
+              </div>
+              <button className="game-btn continue-btn"
+                onClick={() => handleRestart(false)}
+                tabIndex={0}
+                aria-label="Restart Game"
+              >Restart</button>
+            </div>
+          )}
+          {/* Level Complete Overlay */}
           {levelCompleted && (
-            <button
-              className="game-btn"
-              style={{
-                position: "absolute",
-                left: "50%",
-                bottom: "18%",
-                transform: "translateX(-50%)",
-                fontSize: "1.25rem",
-                padding: "15px 48px",
-                zIndex: 23,
-                background: "#43a047"
-              }}
-              onClick={handleContinueLevel}
-              tabIndex={0}
-              aria-label="Continue to Next Level"
-            >
-              Continue
-            </button>
+            <div className="game-overlay-panel victory" tabIndex={0}>
+              <h2>Level {level} Complete!</h2>
+              <div className="desc">
+                Congratulations! Continue to next level.<br />
+              </div>
+              <button
+                className="game-btn continue-btn"
+                onClick={handleContinueLevel}
+                tabIndex={0}
+                aria-label="Continue to Next Level"
+              >Continue</button>
+            </div>
           )}
         </div>
         {/* ---- Control Buttons ---- */}
-        <div
-          style={{
-            display: "flex",
-            gap: "1.5rem",
-          }}
-        >
+        <div style={{
+          display: "flex",
+          gap: "2.1rem",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: ".7rem"
+        }}>
           <button
             className="game-btn"
             tabIndex={0}
@@ -794,14 +785,15 @@ function App() {
             Restart
           </button>
         </div>
-        <div style={{ marginTop: "1.3rem", color: "#888", fontSize: 14 }}>
-          <span>
-            Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move. Grab the flag, then find the drop-off box to score!<br />
-            Opposing bots will compete for the flag!<br />
-            Earn 3 points to clear the level. Levels get harder!<br/>
-          </span>
+        {/* Controls and Level info below */}
+        <div className="controls-panel">
+          Controls:&nbsp;
+          <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.<br />
+          Grab the flag, then find the drop-off box to score!<br />
+          Opposing bots will compete for the flag.<br />
+          Earn 3 points to clear the level. Levels get harder!
         </div>
-        <div style={{ marginTop: "0.7rem", color: "#bbb", fontSize: 13 }}>
+        <div className="level-panel">
           Level: {level} &nbsp;|&nbsp; Bots: {numBots} &nbsp;|&nbsp; Obstacles: {obstacles.length}
         </div>
       </main>
