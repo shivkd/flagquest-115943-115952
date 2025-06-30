@@ -18,18 +18,30 @@ const PLAYER_SPEED = 3.1; // px per tick
 const BOT_SPEED = 2.15;
 const FLAG_ZONE_RADIUS = 32;
 const NUM_BOTS = 2;
+const DROPOFF_BOX_SIZE = 30;
 
 // Utility: clamp position to inside field
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-// Helper for random position, used for flag/bots placement
+// Helper for random position, used for flag/bots/drop-off placement
 function randomPos(w, h, margin = 18) {
   return {
     x: Math.random() * (w - 2 * margin) + margin,
     y: Math.random() * (h - 2 * margin) + margin,
   };
+}
+
+// Returns a random drop-off box position, away from the player's start zone and flag spawn region
+function randomDropoffBox(w, h, margin = 40) {
+  let pos;
+  do {
+    pos = randomPos(w, h, margin);
+  } while (
+    pos.x < CANVAS_W / 3 // Don't allow drop-off too close to player starting side
+  );
+  return pos;
 }
 
 // PUBLIC_INTERFACE
@@ -50,10 +62,22 @@ function App() {
   const [flag, setFlag] = useState(() =>
     ({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true })
   );
+  // Drop-off box appears after player picks up flag
+  const [dropoffBox, setDropoffBox] = useState(null);
+
   const [timer, setTimer] = useState(120); // seconds
   const [running, setRunning] = useState(false);
   const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over"
   const [winner, setWinner] = useState(null);
+  const [message, setMessage] = useState(""); // End-of-game/score message
+
+  // Level/progression state: structure for future expansion
+  const [level, setLevel] = useState(1);
+  /*
+    // Future: When implementing level progression, you'll use this state.
+    // Levels can control: number of bots, obstacles, timings, etc.
+    // Example: setLevel(level+1); and handle advanced layouts.
+  */
 
   const canvasRef = useRef(null);
   // Controls: which keys currently pressed (WASD/Arrows)
@@ -114,8 +138,7 @@ function App() {
 
       // PLAYER: apply controls
       let [px, py] = [player.x, player.y];
-      let pvx = 0,
-        pvy = 0;
+      let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
       if (keyState.current.down) pvy += PLAYER_SPEED;
       if (keyState.current.left) pvx -= PLAYER_SPEED;
@@ -140,8 +163,7 @@ function App() {
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let dist = Math.sqrt(dx * dx + dy * dy);
-        let bvx = 0,
-          bvy = 0;
+        let bvx = 0, bvy = 0;
         if (dist > 3) {
           bvx = (dx / dist) * BOT_SPEED;
           bvy = (dy / dist) * BOT_SPEED;
@@ -156,18 +178,21 @@ function App() {
         return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
       }
 
-      // Check flag pickup/drop for player and bots
+      // Check flag pickup/drop for player (bots cannot pickup)
       let newFlag = { ...flag };
+      let showDropoffNow = dropoffBox;
 
-      // Player pickup flag (if not held)
+      // -- Player picks up flag --
       if (
         !flag.heldBy &&
         dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
       ) {
         newFlag.heldBy = "player";
         newFlag.home = false;
+        // Generate a drop-off box at random position (not too close to player start)
+        setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
+        showDropoffNow = true;
       }
-      // Bots are NOT allowed to pick up the flag - Remove bot pickup logic
 
       // Collision detection: check if any AI bot catches player
       let gameOverByAICatch = false;
@@ -178,26 +203,28 @@ function App() {
         }
       });
 
-      // Player scores: reaches left side with flag
+      // --- Detect drop-off for score/level end ---
+      // Only enabled if player is carrying flag and dropoffBox is set
       let playerScored = false;
       if (
         newFlag.heldBy === "player" &&
-        px < FLAG_ZONE_RADIUS + PLAYER_SIZE / 2
+        dropoffBox &&
+        dist(px, py, dropoffBox.x, dropoffBox.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
       ) {
         playerScored = true;
       }
 
-      // Bots can no longer score with the flag
-      // Remove bot scoring logic - bots cannot pick up or carry the flag
-
-      // Reset flag on score, increment player score, no bot scoring
+      // Reset flag on score, increment player score, remove drop-off box
       let newPlayer = { ...player, x: px, y: py };
       let updatedBots = newBots;
       let newPlayerScore = player.score;
       let newBotScores = bots.map((b) => b.score);
+      let postScoreMessage = "";
 
       if (playerScored) {
         newPlayerScore += 1;
+        postScoreMessage = "Flag delivered! +1 point.";
+        // Remove flag/dropoff, reset flag/bot/player position.
         newFlag = { ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true };
         updatedBots = bots.map((b, i) => ({
           ...b,
@@ -205,6 +232,7 @@ function App() {
           y: 2 * CANVAS_H / 3 - i * 30,
         }));
         newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
+        setDropoffBox(null);
       } else {
         // Carry flag if held
         if (newFlag.heldBy === "player") {
@@ -216,22 +244,36 @@ function App() {
       // End/game over/AI catch condition: first to 3 points or bot catches player
       let gameOver = false;
       let newWinner = null;
+      let endMsg = "";
       if (gameOverByAICatch) {
         gameOver = true;
         newWinner = "bot";
+        endMsg = "You were caught by a bot!";
       }
       if (newPlayerScore >= 3) {
         gameOver = true;
         newWinner = "player";
+        endMsg = "You win! Great job!";
       }
       if (Math.max(...newBotScores) >= 3) {
         gameOver = true;
         newWinner = "bot";
+        endMsg = "Bots win! Try again!";
       }
       if (gameOver) {
         setGamestate("over");
         setRunning(false);
         setWinner(newWinner);
+        setMessage(endMsg);
+        setDropoffBox(null);
+      } else if (playerScored && !gameOver) {
+        setMessage(postScoreMessage);
+        // For "level progression", you'll increment setLevel(level+1) and reset state here in the future.
+        // Example:
+        // setLevel(level + 1);
+        // add obstacles, increase bots, etc. for next level
+      } else {
+        setMessage("");
       }
 
       // Update all state
@@ -252,7 +294,7 @@ function App() {
       if (anim) cancelAnimationFrame(anim);
     };
     // eslint-disable-next-line
-  }, [gamestate, running, player, bots, flag]);
+  }, [gamestate, running, player, bots, flag, dropoffBox, level]);
 
   // Draw canvas game area
   useEffect(() => {
@@ -277,6 +319,34 @@ function App() {
     ctx.arc(CANVAS_W, CANVAS_H / 2, FLAG_ZONE_RADIUS, Math.PI * 1.5, Math.PI / 2, false);
     ctx.fillStyle = "#f9e7e7";
     ctx.fill();
+
+    // Drop-off box (draw only if active)
+    if (dropoffBox) {
+      ctx.save();
+      ctx.globalAlpha = 0.91;
+      ctx.beginPath();
+      ctx.rect(
+        dropoffBox.x - DROPOFF_BOX_SIZE / 2,
+        dropoffBox.y - DROPOFF_BOX_SIZE / 2,
+        DROPOFF_BOX_SIZE,
+        DROPOFF_BOX_SIZE
+      );
+      ctx.fillStyle = "#43a047";
+      ctx.strokeStyle = "#197c2c";
+      ctx.shadowColor = "#43a04766";
+      ctx.shadowBlur = 7;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      // Draw label
+      ctx.font = "bold 14px Arial";
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.fillText("Drop-Off", dropoffBox.x, dropoffBox.y - DROPOFF_BOX_SIZE / 2 - 5);
+      ctx.restore();
+    }
 
     // Flag
     if (flag.home) {
@@ -375,13 +445,14 @@ function App() {
       ctx.restore();
     }
     // eslint-disable-next-line
-  }, [player, bots, flag, gamestate, winner]);
+  }, [player, bots, flag, gamestate, winner, dropoffBox]);
 
   // Button actions
   const handleStart = () => {
     setGamestate("running");
     setRunning(true);
     setWinner(null);
+    setMessage("");
     if (timer <= 0 || gamestate === "over") setTimer(120);
   };
 
@@ -405,8 +476,12 @@ function App() {
       }))
     );
     setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
+    setDropoffBox(null);
     setTimer(120);
     setWinner(null);
+    setMessage("");
+    // Reset level to 1 (for future level progression, could preserve level on restart if going to next stage)
+    setLevel(1);
     keyState.current = {};
     if (autoStart) {
       setGamestate("running");
@@ -425,6 +500,14 @@ function App() {
   let flagStatus = "Safe";
   if (flag.heldBy === "player") flagStatus = "You";
   // Bots can no longer hold the flag, so no "Opponent" state.
+
+  // Display drop-off box status in UI
+  let dropoffStatus = "";
+  if (flag.heldBy === "player" && dropoffBox) {
+    dropoffStatus = "Bring the flag to the drop-off box!";
+  } else if (message) {
+    dropoffStatus = message;
+  }
 
   // First bot with highest score for display
   const oppScore = Math.max(...bots.map((b) => b.score));
@@ -480,6 +563,21 @@ function App() {
           </span>
         </div>
       </section>
+      {dropoffStatus && (
+        <div
+          style={{
+            marginTop: ".8rem",
+            textAlign: "center",
+            color: "#43a047",
+            fontSize: 17,
+            fontWeight: 600,
+            letterSpacing: "0.014em",
+            minHeight: 25,
+          }}
+        >
+          {dropoffStatus}
+        </div>
+      )}
 
       <main
         style={{
@@ -566,9 +664,13 @@ function App() {
         </div>
         <div style={{ marginTop: "1.3rem", color: "#888", fontSize: 14 }}>
           <span>
-            Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move. Score 3 to win.<br />
-            Opposing bots will compete for the flag!
+            Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move. Grab the flag, then find the drop-off box to score!<br />
+            Opposing bots will compete for the flag!<br />
+            {/* Future: Levels will include more obstacles & harder bots. */}
           </span>
+        </div>
+        <div style={{ marginTop: "0.7rem", color: "#bbb", fontSize: 13 }}>
+          Level: {level}
         </div>
       </main>
     </div>
