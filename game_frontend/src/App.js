@@ -106,7 +106,9 @@ function App() {
   // Drop-off box appears after player picks up flag
   const [dropoffBox, setDropoffBox] = useState(null);
 
-  const [timer, setTimer] = useState(120); // seconds
+  // Timer values
+  const TIMER_DURATION = 90; // 90 seconds per session as required
+  const [timer, setTimer] = useState(TIMER_DURATION); // seconds
   const [running, setRunning] = useState(false);
   const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over", "levelcomplete"
   const [winner, setWinner] = useState(null);
@@ -125,12 +127,17 @@ function App() {
     if (timer <= 0) {
       setGamestate("over");
       setRunning(false);
+      setMessage(`Time's up! Your score: ${player.score}`);
+      setWinner("player"); // treat as player game ended, not a loss
+      setDropoffBox(null);
       return;
     }
     const t = setInterval(() => {
       setTimer((s) => (s > 0 ? s - 1 : 0));
     }, 1000);
     return () => clearInterval(t);
+    // Note: player.score is not included as dependency to avoid infinite refresh.
+    // eslint-disable-next-line
   }, [running, timer]);
 
   // Keyboard controls: WASD, Arrow keys, and 'r' for restart/autostart
@@ -622,7 +629,7 @@ function App() {
     setRunning(true);
     setWinner(null);
     setMessage("");
-    if (timer <= 0 || gamestate === "over") setTimer(120);
+    if (timer <= 0 || gamestate === "over") setTimer(TIMER_DURATION);
   };
 
   const handlePause = () => {
@@ -649,7 +656,7 @@ function App() {
     );
     setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
     setDropoffBox(null);
-    setTimer(120);
+    setTimer(TIMER_DURATION);
     setWinner(null);
     setMessage("");
     setLevelCompleted(false);
@@ -688,7 +695,7 @@ function App() {
     );
     setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
     setDropoffBox(null);
-    setTimer(120);
+    setTimer(TIMER_DURATION);
     setWinner(null);
     setMessage("");
     setLevelCompleted(false);
@@ -700,6 +707,17 @@ function App() {
   // Format timer mm:ss
   const pad = (n) => String(n).padStart(2, "0");
   const timerStr = `${pad(Math.floor(timer / 60))}:${pad(timer % 60)}`;
+
+  // Color for timer, more urgent as time is below 20 seconds and <10
+  let timerColor = "#ffd57e";
+  let timerBG = "var(--timer-bg)";
+  if (timer <= 10) {
+    timerColor = "#ff4469";
+    timerBG = "#37090fc2";
+  } else if (timer <= 20) {
+    timerColor = "#ff9800";
+    timerBG = "#422314bb";
+  }
 
   // Who has flag
   let flagStatus = "Safe";
@@ -749,16 +767,21 @@ function App() {
         <div>
           Timer:{" "}
           <span style={{
-            color: "#ffd57e",
-            background: "var(--timer-bg)",
-            boxShadow: "0 1.5px 10px 2px #ffb02127",
+            color: timerColor,
+            background: timerBG,
+            boxShadow: timer <= 10
+              ? "0 4px 14px 3px #ff445a38"
+              : "0 1.5px 10px 2px #ffb02127",
             borderRadius: "7.5px",
             padding: "4.5px 18px",
             fontFamily: "'Orbitron', 'Exo', monospace",
             letterSpacing: "0.08em",
             fontWeight: 800,
-            fontSize: "1.09em",
-            border: "1.3px solid var(--panel-outline)"
+            fontSize: "1.19em",
+            border: timer <= 10
+              ? "2.3px solid #ff4469"
+              : "1.3px solid var(--panel-outline)",
+            transition: "background 0.2s, color 0.2s, border 0.15s"
           }}>
             {timerStr}
           </span>
@@ -812,16 +835,29 @@ function App() {
             aria-label="Game Canvas"
           />
 
-          {/* Overlay Victory/Defeat or Level Complete */}
+          {/* Overlay Victory/Defeat/Timer End or Level Complete */}
           {(gamestate === "over" || winner) && (
             <div className={`game-overlay-panel ${winner === "player" ? "victory" : "defeat"}`} tabIndex={0}>
               <h2>
-                {winner === "player" ? "You Win! 🎉" : winner === "bot" ? "Bots Win! 🤖" : "Game Over"}
+                {timer === 0
+                  ? "Time's Up!"
+                  : winner === "player"
+                    ? "You Win! 🎉"
+                    : winner === "bot"
+                      ? "Bots Win! 🤖"
+                      : "Game Over"}
               </h2>
               <div className="desc">
-                {message || (winner === "player"
-                  ? "Legendary moves! Next time, try with more bots!"
-                  : winner === "bot" ? "Bots outsmarted you this round!" : "Try again!")}
+                {timer === 0
+                  ? <>
+                      Time's up!<br />Your score: <strong>{player.score}</strong>
+                    </>
+                  : (message ||
+                    (winner === "player"
+                      ? "Legendary moves! Next time, try with more bots!"
+                      : winner === "bot"
+                        ? "Bots outsmarted you this round!"
+                        : "Try again!"))}
               </div>
               <button className="game-btn continue-btn"
                 onClick={() => handleRestart(false)}
@@ -887,7 +923,10 @@ function App() {
           <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.<br />
           Grab the flag, then find the drop-off box to score!<br />
           Opposing bots will compete for the flag.<br />
-          Earn 3 points to clear the level. Levels get harder!
+          Earn 3 points to clear the level. Levels get harder!<br />
+          <span style={{color:"#ff9800",fontWeight:700,letterSpacing:".06em"}}>
+            Score as many points as you can in 90 seconds!
+          </span>
         </div>
         <div className="level-panel">
           Level: {level} &nbsp;|&nbsp; Bots: {numBots} &nbsp;|&nbsp; Obstacles: {obstacles.length}
