@@ -235,11 +235,24 @@ function App() {
         BOT_SPEED_CAP
       );
 
-      // ----- Bots: Move toward player -----
-      let botsAfterMove = botsArr.map((bot) => {
-        let target = { x: p.x, y: p.y }; // use latest player pos
-        let dx = target.x - bot.x;
-        let dy = target.y - bot.y;
+      // ----- Bots: Move toward player with randomized/separated trajectories -----
+      let botsAfterMove = botsArr.map((bot, i) => {
+        // Each bot is given a (pseudo)unique "chase offset" based on their index and minor randomness
+        // so that the bots don't all path towards (player.x, player.y) exactly.
+        // This biases paths with a small offset, producing separation and staggered pursuit.
+        const botChaseAngleBase = Math.atan2(p.y - bot.y, p.x - bot.x);
+
+        // Angle deviation: each bot receives a base offset (spread over [-20°, +20°]) plus frame random
+        const indexSpread = ((i - (botsArr.length - 1) / 2) * Math.PI) / (botsArr.length * 3.3); // spread = ~±17°
+        const randomWobble = (Math.random() - 0.5) * 0.18; // random add ±0.09 rad ≈±5°, per update
+        const chaseAngle = botChaseAngleBase + indexSpread + randomWobble;
+
+        // Slight distance variation: makes them "orbit" at different radii if stacked
+        const biasDist = 2.5 + 2 * Math.abs(indexSpread) + Math.random() * 1.2;
+
+        let dx = Math.cos(chaseAngle) * (Math.abs(p.x - bot.x) + biasDist);
+        let dy = Math.sin(chaseAngle) * (Math.abs(p.y - bot.y) + biasDist);
+
         let distToTgt = Math.sqrt(dx * dx + dy * dy);
         let bvx = 0, bvy = 0;
         if (distToTgt > 3) {
@@ -248,8 +261,18 @@ function App() {
           // Try full move, then just x, then just y; fallback: don't move
           let maybeBx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
           let maybeBy = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
-          // Use obstacle collision test (bots will "slide" or get stuck, as before)
-          if (!checkCollisionWithObstacles(maybeBx, maybeBy, 0)) {
+          // Try to avoid moving "into" another bot's exact spot (separation logic)
+          const separationThreshold = BOT_SIZE * 0.84;
+          let willStack = botsArr.some(
+            (other, j) =>
+              other.id !== bot.id &&
+              Math.abs(maybeBx - other.x) < separationThreshold &&
+              Math.abs(maybeBy - other.y) < separationThreshold
+          );
+          if (
+            !checkCollisionWithObstacles(maybeBx, maybeBy, 0) &&
+            !willStack
+          ) {
             return { ...bot, x: maybeBx, y: maybeBy };
           } else if (!checkCollisionWithObstacles(bot.x + bvx, bot.y, 0)) {
             return {
