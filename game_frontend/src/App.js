@@ -215,7 +215,9 @@ function App() {
   const laserNextTimerRef = useRef(0);
 
   // Timer/game state
-  const TIMER_DURATION = 90;
+  const TIMER_DURATION = 90; // 90 seconds global for all levels
+
+  // Timer is now global (does NOT reset on level transitions)
   const [timer, setTimer] = useState(TIMER_DURATION);
   const [running, setRunning] = useState(false);
   const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over", "levelcomplete"
@@ -223,26 +225,32 @@ function App() {
   const [message, setMessage] = useState("");
   const [levelCompleted, setLevelCompleted] = useState(false);
 
+  // Track total score (persist and show at end)
+  const [sessionScore, setSessionScore] = useState(0);
+  // Track per-level player score for session summary
+  const [levelScores, setLevelScores] = useState([]); // [{level, points}...]
+
   const canvasRef = useRef(null);
   const keyState = useRef({});
 
-  // Timer loop for game time
+  // Timer loop for game time: end session (entire run) if timer=0, freeze all gameplay across all levels
   useEffect(() => {
     if (!running) return;
     if (timer <= 0) {
       setGamestate("over");
       setRunning(false);
-      setMessage(`Time's up! Your score: ${player.score}`);
-      setWinner("player");
+      setWinner(null); // No 'win' label when time's up—show special overlay
       setDropoffBox(null);
+      // tally the final session score just in case
+      setSessionScore(player.score);
+      // don't allow further gameplay
       return;
     }
     const t = setInterval(() => {
       setTimer((s) => (s > 0 ? s - 1 : 0));
     }, 1000);
     return () => clearInterval(t);
-    // eslint-disable-next-line
-  }, [running, timer]);
+  }, [running, timer, player.score]);
 
   // Keyboard controls
   useEffect(() => {
@@ -1109,7 +1117,6 @@ function App() {
 
       const numBotsForLevel = BASE_NUM_BOTS + (activeLevel - 1) * BOT_INCREASE_RATE;
       const obstaclesForLevel = randomObstaclesPRNG(prng, (activeLevel - 1) * OBSTACLE_INCREASE_RATE);
-      // Note, bots are not truly random in the default version, but preserve structure for future extension
       const botsForLevel = randomBotsPRNG(prng, numBotsForLevel);
       const flagForLevel = randomFlagPRNG(prng);
 
@@ -1120,11 +1127,15 @@ function App() {
       setFlag(flagForLevel);
       setDropoffBox(null);
       setTimer(TIMER_DURATION);
+      setSessionScore(0);
+      setLevelScores([]);
       setWinner(null);
       setMessage("");
       setLevelCompleted(false);
       // DO NOT reset setLevel here - preserve the current level (levelSeed)!
-      setBombs([]); // clear hazards on restart
+      setLevel(1); // fresh run: set back to level 1
+      setLevelSeed(uniqueSeed());
+      setBombs([]);
       setLasers([]);
       bombNextTimerRef.current = 0;
       laserNextTimerRef.current = 0;
@@ -1141,6 +1152,7 @@ function App() {
   );
 
   // Level-up: advance to next level
+  // At each level transition, accumulate score. The timer does NOT reset.
   const handleContinueLevel = useCallback(() => {
     const nextLevel = level + 1;
     const newSeed = uniqueSeed(); // Generate a new unique seed for this new level, so every level is reproducible but unique
@@ -1150,30 +1162,44 @@ function App() {
     const newBots = randomBotsPRNG(prng, newNumBots);
     const newFlag = randomFlagPRNG(prng);
 
+    // Keep running score: current player.score is endpoint of just-completed level
+    setLevelScores(prev => [
+      ...prev,
+      { level: level, points: player.score - (prev[prev.length-1]?.accum || 0) || player.score }
+    ]);
+    setSessionScore(player.score);
+
     setLevel(nextLevel);
     setLevelSeed(newSeed);
     setNumBots(newNumBots);
     setObstacles(newObstacles);
-    setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
+    // Keep player's running score!
+    setPlayer(prevPlayer => ({
+      ...prevPlayer,
+      x: 60,
+      y: CANVAS_H / 2,
+      dx: 0,
+      dy: 0
+      // score: do NOT reset
+    }));
     setBots(newBots);
     setFlag(newFlag);
     setDropoffBox(null);
-    setTimer(TIMER_DURATION);
+    // DO NOT reset setTimer — timer is global!
     setWinner(null);
     setMessage("");
     setLevelCompleted(false);
     setGamestate("running");
     setRunning(true);
-    setBombs([]); // clear hazards for new level
+    setBombs([]);
     setLasers([]);
     bombNextTimerRef.current = 0;
     laserNextTimerRef.current = 0;
     keyState.current = {};
-    // Focus the panel ref after new level starts
     setTimeout(() => {
       if (panelRef.current) panelRef.current.focus();
     }, 100);
-  }, [level]);
+  }, [level, player.score]);
 
   // Auto-focus panel ref whenever entering running state after overlays
   // Reset the seed if this is ever a fresh game (entering new game, not a restart), only if levelSeed is null/undefined (safety)
@@ -1211,6 +1237,11 @@ function App() {
     dropoffStatus = message;
   }
   const oppScore = Math.max(...bots.map((b) => b.score));
+
+  // Prepare session summary for overlay at end of run
+  const totalPoints = player.score; // This is running session total
+  const sessionEnded = (gamestate === "over" && timer === 0);
+
   return (
     <div className="App">
       <header>
@@ -1326,7 +1357,73 @@ function App() {
             aria-label="Game Canvas"
           />
           {/* Overlays */}
-          {(gamestate === "over" || winner) && (
+          {/* Overlay: Session End - Timer 0 */}
+          {sessionEnded && (
+            <div
+              className="game-overlay-panel defeat"
+              tabIndex={0}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <h2 style={{ marginBottom: "11px" }}>
+                Time's Up!
+              </h2>
+              <div className="desc" style={{ marginBottom: "18px", textAlign: "center" }}>
+                <strong>Session Complete</strong><br />
+                <span style={{ fontWeight: 500 }}>
+                  Well played! <br />
+                </span>
+                <span style={{ display: "inline-block", margin: "11px 0 5px 0" }}>
+                  <span style={{ fontWeight: 700, color: "#2196f3", fontSize: "1.12em" }}>
+                    Total Points: {totalPoints}
+                  </span>
+                </span>
+                <br />
+                <span style={{ fontSize: "0.96em", color: "#333" }}>
+                  {levelScores.length > 0 && (
+                    <table style={{ margin: "10px auto 0 auto", fontSize: "0.97em" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: "3px 10px", color: "#2196f3" }}>Level</th>
+                          <th style={{ padding: "3px 10px", color: "#43a047" }}>Points</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {levelScores.map((ls, idx) => (
+                          <tr key={ls.level}>
+                            <td style={{ textAlign: "center" }}>{ls.level}</td>
+                            <td style={{ textAlign: "center" }}>{ls.points}</td>
+                          </tr>
+                        ))}
+                        <tr style={{ fontWeight: 700 }}>
+                          <td style={{ textAlign: "center" }}>Total</td>
+                          <td style={{ textAlign: "center", color: "#2196f3" }}>{totalPoints}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  )}
+                  {levelScores.length === 0 && (
+                    <span>No flags delivered this session.<br/>Try again!</span>
+                  )}
+                </span>
+              </div>
+              <button
+                className="game-btn continue-btn"
+                onClick={() => handleRestart(true)}
+                tabIndex={0}
+                aria-label="Restart Game"
+                style={{ marginTop: "10px" }}
+              >
+                Restart
+              </button>
+            </div>
+          )}
+          {/* Overlay: Bot/Player Win/Loss/Level End */}
+          {!sessionEnded && (gamestate === "over" || winner) && (
             <div
               className={`game-overlay-panel ${
                 winner === "player" ? "victory" : "defeat"
@@ -1334,22 +1431,14 @@ function App() {
               tabIndex={0}
             >
               <h2>
-                {timer === 0
-                  ? "Time's Up!"
-                  : winner === "player"
+                {winner === "player"
                   ? "You Win! 🎉"
                   : winner === "bot"
                   ? "Bots Win! 🤖"
                   : "Game Over"}
               </h2>
               <div className="desc">
-                {timer === 0 ? (
-                  <>
-                    Time's up!
-                    <br />
-                    Your score: <strong>{player.score}</strong>
-                  </>
-                ) : message ||
+                {message ||
                   (winner === "player"
                     ? "Legendary moves! Next time, try with more bots!"
                     : winner === "bot"
@@ -1382,7 +1471,8 @@ function App() {
                 Level {level} Complete!
               </h2>
               <div className="desc" style={{ marginBottom: "24px" }}>
-                Congratulations! Continue to next level.
+                Congratulations! Continue to next level.<br/>
+                Your session score: <strong>{player.score}</strong>
               </div>
               <button
                 className="game-btn continue-btn"
@@ -1440,7 +1530,7 @@ function App() {
           <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.<br />
           Grab the flag, then find the drop-off box to score!<br />
           Opposing bots will compete for the flag.<br />
-          Earn 3 points to clear the level. Levels get harder!<br />
+          Earn as many points as you can<br />
           <span
             style={{
               color: "#ff9800",
@@ -1448,7 +1538,7 @@ function App() {
               letterSpacing: ".06em",
             }}
           >
-            Score as many points as you can in 90 seconds!
+            Session runs for 90 seconds—try to deliver as many flags as possible!
           </span>
         </div>
         <div className="level-panel">
