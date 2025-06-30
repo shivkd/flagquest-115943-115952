@@ -10,11 +10,10 @@ const FLAG_SIZE = 16;
 const PLAYER_SPEED = 2.3;
 const BOT_SPEED = 1.65;
 const NUM_BOTS = 3;
-const ROUND_TIME = 120; // seconds
+const ROUND_TIME = 120;
 
 const TEAM = { PLAYER: "Player", BOT: "Bots" };
 
-// Helper for collision
 function rectsOverlap(r1, r2) {
   return (
     r1.x < r2.x + r2.size &&
@@ -24,7 +23,6 @@ function rectsOverlap(r1, r2) {
   );
 }
 
-// --- Colors ---
 const COLORS = {
   player: "#2196f3",
   bot: "#43a047",
@@ -38,9 +36,7 @@ const COLORS = {
   accent: "#ff9800",
 };
 
-// --- Main App ---
 function App() {
-  // Game State
   const [score, setScore] = useState({ player: 0, bots: 0 });
   const [time, setTime] = useState(ROUND_TIME);
   const [isRunning, setIsRunning] = useState(false);
@@ -48,7 +44,6 @@ function App() {
   const [flagState, setFlagState] = useState({ holder: null, pos: { x: 0, y: 0 } });
   const [showSplash, setShowSplash] = useState(true);
 
-  // Game Entities
   const [player, setPlayer] = useState({
     x: 60,
     y: GAME_HEIGHT / 2 - PLAYER_SIZE / 2,
@@ -70,19 +65,15 @@ function App() {
   const animationRef = useRef();
   const keysRef = useRef({});
   const timerRef = useRef();
-  const [lastFrameTime, setLastFrameTime] = useState(performance.now());
 
-  // --- INIT (on New Game) ---
   useEffect(() => {
     if (!isRunning) return;
-    // Reset state
     setScore({ player: 0, bots: 0 });
     setTime(ROUND_TIME);
     setWinner(null);
     resetEntities();
     setShowSplash(false);
 
-    // Timer
     timerRef.current = setInterval(() => {
       setTime((t) => {
         if (t <= 1) {
@@ -102,7 +93,6 @@ function App() {
     }, 1000);
 
     animationRef.current = requestAnimationFrame(gameLoop);
-    // Cleanup
     return () => {
       clearInterval(timerRef.current);
       cancelAnimationFrame(animationRef.current);
@@ -110,7 +100,6 @@ function App() {
     // eslint-disable-next-line
   }, [isRunning]);
 
-  // --- Reset all entities and flag position ---
   function resetEntities() {
     setPlayer({
       x: 60,
@@ -142,7 +131,6 @@ function App() {
     });
   }
 
-  // --- KEYBOARD HANDLING ---
   useEffect(() => {
     function onKeyDown(e) {
       keysRef.current[e.key.toLowerCase()] = true;
@@ -158,9 +146,7 @@ function App() {
     };
   }, []);
 
-  // --- MAIN GAME LOOP ---
   function gameLoop(now) {
-    // Move Player
     let move = { dx: 0, dy: 0 };
     if (keysRef.current["arrowup"] || keysRef.current["w"]) move.dy = -1;
     if (keysRef.current["arrowdown"] || keysRef.current["s"]) move.dy = 1;
@@ -178,7 +164,6 @@ function App() {
     py = Math.max(0, Math.min(GAME_HEIGHT - PLAYER_SIZE, py));
     let playerUpdate = { ...player, x: px, y: py };
 
-    // Handle Player-Flag Pickup
     let flagRect = {
       x: flagState.pos.x,
       y: flagState.pos.y,
@@ -195,12 +180,10 @@ function App() {
       rectsOverlap(playerRect, flagRect) &&
       flagState.team === TEAM.BOT
     ) {
-      // Player picks up bot team flag
       flagHeld = TEAM.PLAYER;
       playerUpdate.carryingFlag = true;
     }
 
-    // Handle Player returns flag to base
     if (
       flagHeld === TEAM.PLAYER &&
       playerUpdate.carryingFlag &&
@@ -208,7 +191,6 @@ function App() {
       py + PLAYER_SIZE > playerBase.y &&
       py < playerBase.y + playerBase.size
     ) {
-      // Score
       setScore((prev) => ({ ...prev, player: prev.player + 1 }));
       playerUpdate.carryingFlag = false;
       setFlagState({
@@ -216,13 +198,11 @@ function App() {
         pos: { x: GAME_WIDTH / 2 - FLAG_SIZE / 2, y: GAME_HEIGHT / 2 - FLAG_SIZE / 2 },
         team: TEAM.BOT,
       });
-      // Reset bots also slightly
       setBots((bs) =>
         bs.map((bot, idx) => ({ ...bot, x: botBases[idx].x, y: botBases[idx].y, carryingFlag: false }))
       );
     }
 
-    // --- AI Bots Logic
     let botFlagBaseRect = {
       x: GAME_WIDTH - 80,
       y: GAME_HEIGHT / 2 - 40,
@@ -232,8 +212,6 @@ function App() {
       let bx = bot.x,
         by = bot.y;
       let action = "seekFlag";
-
-      // 1. If carrying flag, head to their base
       if (
         flagState.holder === bot.id ||
         (flagState.holder === TEAM.BOT && bot.carryingFlag)
@@ -244,7 +222,6 @@ function App() {
           by > botFlagBaseRect.y &&
           by < botFlagBaseRect.y + botFlagBaseRect.size
         ) {
-          // Scored!
           setScore((prev) => ({ ...prev, bots: prev.bots + 1 }));
           setFlagState({
             holder: null,
@@ -259,7 +236,6 @@ function App() {
           };
         }
       }
-      // 2. If flag available and is for their team, seek it
       else if (
         !flagState.holder &&
         flagState.team === TEAM.PLAYER &&
@@ -267,14 +243,12 @@ function App() {
       ) {
         action = "seekFlag";
       }
-      // 3. If player carrying flag, chase player
       else if (
         flagState.holder === TEAM.PLAYER ||
         player.carryingFlag
       ) {
         action = "chasePlayer";
       }
-      // Move
       let target = null;
       if (action === "returnBase") {
         target = { x: botFlagBaseRect.x + 16, y: botFlagBaseRect.y + 24 };
@@ -292,8 +266,6 @@ function App() {
       let bdy = dist > 2 ? (dy / dist) * BOT_SPEED : 0;
       let nbx = Math.max(0, Math.min(GAME_WIDTH - BOT_SIZE, bx + bdx));
       let nby = Math.max(0, Math.min(GAME_HEIGHT - BOT_SIZE, by + bdy));
-
-      // Handle Bot picks up player flag
       let botRect = { x: nbx, y: nby, size: BOT_SIZE };
       if (
         !flagState.holder &&
@@ -306,19 +278,16 @@ function App() {
         }));
         return { ...bot, x: nbx, y: nby, carryingFlag: true };
       }
-      // If bot has flag, update flag held state
       let carryingFlag = flagState.holder === bot.id;
       return { ...bot, x: nbx, y: nby, carryingFlag };
     });
 
-    // --- Handle Bots tag player carrying flag (reset flag pos)
     botsUpdate.forEach((bot) => {
       let botRect = { x: bot.x, y: bot.y, size: BOT_SIZE };
       if (
         playerUpdate.carryingFlag &&
         rectsOverlap(botRect, playerRect)
       ) {
-        // Drop flag in place
         setFlagState({
           holder: null,
           pos: {
@@ -334,10 +303,8 @@ function App() {
     setPlayer(playerUpdate);
     setBots(botsUpdate);
 
-    // --- Flag Movement
     let flagUpdate = { ...flagState };
     if (flagHeld === TEAM.PLAYER && playerUpdate.carryingFlag) {
-      // Attach flag to player
       flagUpdate.pos = { x: px + PLAYER_SIZE / 2 - FLAG_SIZE / 2, y: py - 8 };
       flagUpdate.holder = TEAM.PLAYER;
       flagUpdate.team = TEAM.BOT;
@@ -358,23 +325,18 @@ function App() {
     }
     setFlagState(flagUpdate);
 
-    // Check if time's up or not running
     if (isRunning) {
       animationRef.current = requestAnimationFrame(gameLoop);
     }
   }
 
-  // --- CANVAS RENDER (draw) ---
   useEffect(() => {
     const ctx = gameCanvasRef.current.getContext("2d");
-    // Clear
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // --- Field ---
     ctx.fillStyle = COLORS.field;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Midline
     ctx.strokeStyle = COLORS.border;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -382,17 +344,12 @@ function App() {
     ctx.lineTo(GAME_WIDTH / 2, GAME_HEIGHT);
     ctx.stroke();
 
-    // --- Bases ---
-    // Player base
     ctx.fillStyle = COLORS.basePlayer;
     ctx.fillRect(playerBase.x, playerBase.y, playerBase.size, playerBase.size);
-    // Bots base
     ctx.fillStyle = COLORS.baseBot;
     ctx.fillRect(GAME_WIDTH - 80, GAME_HEIGHT / 2 - 40, 60, 60);
 
-    // --- Flags ---
     if (!flagState.holder) {
-      // Draw flag on ground
       ctx.fillStyle =
         flagState.team === TEAM.PLAYER
           ? COLORS.flagPlayer
@@ -407,8 +364,6 @@ function App() {
       );
       ctx.fill();
     }
-
-    // --- Player ---
     ctx.fillStyle = COLORS.player;
     ctx.beginPath();
     ctx.arc(
@@ -423,7 +378,6 @@ function App() {
     ctx.font = "bold 12px sans-serif";
     ctx.fillText("You", player.x - 2, player.y - 8);
 
-    // --- Bots ---
     bots.forEach((bot, idx) => {
       ctx.fillStyle = COLORS.bot;
       ctx.beginPath();
@@ -440,7 +394,6 @@ function App() {
       ctx.fillText("Bot", bot.x - 2, bot.y - 8);
     });
 
-    // --- Carried flags ---
     if (player.carryingFlag) {
       ctx.fillStyle = COLORS.flagBot;
       ctx.beginPath();
@@ -467,13 +420,11 @@ function App() {
         ctx.fill();
       }
     });
-    // Simple aesthetics: outlines
     ctx.strokeStyle = "#BABABA88";
     ctx.lineWidth = 0.8;
     ctx.strokeRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   }, [player, bots, flagState, isRunning]);
 
-  // --- TIMER AND GAME END ---
   useEffect(() => {
     if (time === 0 && !winner && !showSplash) {
       if (score.player > score.bots) setWinner("You Win!");
@@ -484,7 +435,6 @@ function App() {
     // eslint-disable-next-line
   }, [time, score, showSplash]);
 
-  // --- UI BUTTONS ---
   function handleStart() {
     setIsRunning(true);
     setShowSplash(false);
@@ -507,9 +457,7 @@ function App() {
     handleStart();
   }
 
-  // --- UI THEME & COLORS SETUP ---
   useEffect(() => {
-    // Set root CSS variables for the light theme
     document.documentElement.style.setProperty("--bg-primary", "#fff");
     document.documentElement.style.setProperty("--bg-secondary", "#f8f9fa");
     document.documentElement.style.setProperty("--text-primary", COLORS.text);
@@ -517,8 +465,8 @@ function App() {
     document.documentElement.style.setProperty("--button-text", "#fff");
   }, []);
 
-  // --- UI Render ---
   return (
+    <>
       <div className="App" style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
         <header style={{ background: "var(--bg-secondary)", padding: "16px 0 24px 0" }}>
           <h1 style={{
@@ -541,7 +489,6 @@ function App() {
         </header>
 
         <div style={{ width: GAME_WIDTH, margin: "0 auto" }}>
-          {/* Top Game State Bar */}
           <div
             style={{
               display: "flex",
@@ -586,7 +533,6 @@ function App() {
             </span>
           </div>
 
-          {/* Game Canvas */}
           <section>
             <div
               style={{
@@ -612,7 +558,6 @@ function App() {
                 tabIndex={0}
               />
             </div>
-            {/* Timer, instructions, and results */}
             <div style={{
               display: "flex",
               justifyContent: "space-between",
@@ -639,7 +584,6 @@ function App() {
               </span>
             </div>
           </section>
-          {/* Buttons */}
           <div
             style={{
               display: "flex",
@@ -679,7 +623,6 @@ function App() {
               </div>
             )}
           </div>
-          {/* End/Winner Splash */}
           {winner && !isRunning && (
             <div
               style={{
@@ -760,6 +703,7 @@ function App() {
           FlagQuest &copy; {new Date().getFullYear()} | Minimalistic 2D Game Demo
         </footer>
       </div>
+    </>
   );
 }
 
