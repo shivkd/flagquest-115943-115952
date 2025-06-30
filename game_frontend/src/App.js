@@ -152,14 +152,15 @@ function App() {
       px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
       py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
 
-      // Bots: move towards flag (if not holding), else toward home
+      // Bots: Move toward flag ONLY if it's not held by the player! If the player has the flag, bots chase the player.
       let newBots = bots.map((bot, i) => {
-        let target =
-          flag.heldBy === `bot:${bot.id}`
-            ? { x: CANVAS_W - 36, y: CANVAS_H / 2 }
-            : flag.heldBy === null
-              ? flag
-              : player;
+        let target;
+        // Bots ignore the flag if it's being held by the player
+        if (flag.heldBy === "player") {
+          target = { x: player.x, y: player.y }; // chase the player with the flag (for catch mechanism)
+        } else {
+          target = flag.heldBy === null ? flag : player; // If flag is free, move to flag, else chase player (default fallback)
+        }
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let dist = Math.sqrt(dx * dx + dy * dy);
@@ -178,7 +179,8 @@ function App() {
         return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
       }
 
-      // Check flag pickup/drop for player (bots cannot pickup)
+      // --- FLAG PICKUP AND INTERACTION LOGIC ---
+      // Only player can grab/carry the flag. Bots can no longer touch/hold/interact with the flag.
       let newFlag = { ...flag };
       let showDropoffNow = dropoffBox;
 
@@ -189,12 +191,13 @@ function App() {
       ) {
         newFlag.heldBy = "player";
         newFlag.home = false;
-        // Generate a drop-off box at random position (not too close to player start)
+        // Generate a drop-off box at a random position (not too close to player start zone)
         setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
         showDropoffNow = true;
       }
+      // The bots can no longer pick up or return the flag. Bots just chase the flag position, or the player if holding the flag.
 
-      // Collision detection: check if any AI bot catches player
+      // Collision detection: bots can "catch" the player if close enough (while player has/has not flag)
       let gameOverByAICatch = false;
       newBots.forEach((bot, i) => {
         // Collision threshold: if distance < sum of radii - fudge (~1)
@@ -203,12 +206,12 @@ function App() {
         }
       });
 
-      // --- Detect drop-off for score/level end ---
+      // --- WIN/DELIVERY LOGIC ---
       // Only enabled if player is carrying flag and dropoffBox is set
       let playerScored = false;
       if (
         newFlag.heldBy === "player" &&
-        dropoffBox &&
+        dropoffBox && // win box appears only after flag is picked up
         dist(px, py, dropoffBox.x, dropoffBox.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
       ) {
         playerScored = true;
@@ -224,7 +227,7 @@ function App() {
       if (playerScored) {
         newPlayerScore += 1;
         postScoreMessage = "Flag delivered! +1 point.";
-        // Remove flag/dropoff, reset flag/bot/player position.
+        // Remove flag and drop-off, reset all positions for next round.
         newFlag = { ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true };
         updatedBots = bots.map((b, i) => ({
           ...b,
@@ -234,7 +237,7 @@ function App() {
         newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
         setDropoffBox(null);
       } else {
-        // Carry flag if held
+        // Carry flag with player if held
         if (newFlag.heldBy === "player") {
           newFlag.x = px;
           newFlag.y = py;
