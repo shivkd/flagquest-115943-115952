@@ -626,12 +626,19 @@ function App() {
   }, [player, bots, flag, gamestate, winner, dropoffBox, obstacles, levelCompleted]);
 
   // Button actions
+  // Ref for panel to enable auto-focus/re-focus after overlays
+  const panelRef = useRef(null);
+
   const handleStart = () => {
     setGamestate("running");
     setRunning(true);
     setWinner(null);
     setMessage("");
     if (timer <= 0 || gamestate === "over") setTimer(TIMER_DURATION);
+    // Re-focus game area for input
+    setTimeout(() => {
+      if (panelRef.current) panelRef.current.focus();
+    }, 80);
   };
 
   const handlePause = () => {
@@ -705,7 +712,18 @@ function App() {
     setGamestate("running");
     setRunning(true);
     keyState.current = {};
+    // Focus the panel ref after new level starts
+    setTimeout(() => {
+      if (panelRef.current) panelRef.current.focus();
+    }, 100);
   }, [level]);
+
+  // Auto-focus panel ref whenever entering running state after overlays
+  useEffect(() => {
+    if (gamestate === "running" && panelRef.current) {
+      panelRef.current.focus();
+    }
+  }, [gamestate]);
 
   // Timer formatting
   const pad = (n) => String(n).padStart(2, "0");
@@ -812,12 +830,16 @@ function App() {
           className="game-canvas-panel"
           tabIndex={0}
           aria-label="Game Area"
-          onFocus={() => {}}
+          ref={panelRef}
+          onFocus={e => {
+            // Optionally, visually indicate focus
+          }}
           style={{
             width: Math.max(440, CANVAS_W + 40),
             height: Math.max(320, CANVAS_H + 48),
             maxWidth: "99vw",
             maxHeight: "99vh",
+            outline: gamestate === "running" ? "2.5px solid var(--accent)" : "none"
           }}
         >
           <canvas
