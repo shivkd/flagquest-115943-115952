@@ -161,24 +161,30 @@ function App() {
   }, []);
 
   // ----- CORE GAME LOOP: player and bot movement -----
+  // The old logic set state (setPlayer, setBots, etc.) inside the animation frame
+  // using values derived from stale state. This caused movement to be unsmooth or non-functional.
+  // Instead, we now use useRef for storing and updating player, bots, and flag for smooth animation frame logic,
+  // then flush those refs into state at each frame, so React state/props always reflect the latest world state.
+
+  // Movement refs to allow animation smoothness and decouple calculation from React batching
+  const playerRef = useRef(null);
+  const botsRef = useRef(null);
+  const flagRef = useRef(null);
+  const dropoffBoxRef = useRef(null);
+
+  // Keep refs in sync with state
+  useEffect(() => { playerRef.current = player; }, [player]);
+  useEffect(() => { botsRef.current = bots; }, [bots]);
+  useEffect(() => { flagRef.current = flag; }, [flag]);
+  useEffect(() => { dropoffBoxRef.current = dropoffBox; }, [dropoffBox]);
+
   useEffect(() => {
     let anim;
     let lastTime = performance.now();
 
-    // Refs for latest state to avoid stutter
-    const stateRef = {
-      player: { ...player },
-      bots: [...bots],
-      flag: { ...flag },
-      dropoffBox,
-      gamestate,
-      level,
-      obstacles: [...obstacles],
-      winner,
-    };
-
+    // Smooth tick using refs for all stateful data, which are only written back every React render
     function checkCollisionWithObstacles(x, y, margin = 4) {
-      return stateRef.obstacles.some(
+      return obstacles.some(
         (o) =>
           Math.abs(o.x - x) < OBSTACLE_SIZE / 2 + PLAYER_SIZE / 2 + margin &&
           Math.abs(o.y - y) < OBSTACLE_SIZE / 2 + PLAYER_SIZE / 2 + margin
@@ -190,12 +196,18 @@ function App() {
     }
 
     function gameTick(now) {
-      if (stateRef.gamestate !== "running") return;
+      if (gamestate !== "running") return;
+
       let delta = Math.min(now - lastTime, 40);
       lastTime = now;
 
+      // --- Use refs for world state in animation frame ---
+      let p = playerRef.current ? { ...playerRef.current } : { ...player };
+      let botsArr = botsRef.current ? botsRef.current.map((b) => ({ ...b })) : bots.map((b) => ({ ...b }));
+      let flagVal = flagRef.current ? { ...flagRef.current } : { ...flag };
+      let box = dropoffBoxRef.current ? { ...dropoffBoxRef.current } : dropoffBox;
+
       // ----- PLAYER PHYSICS -----
-      let [px, py] = [stateRef.player.x, stateRef.player.y];
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
       if (keyState.current.down) pvy += PLAYER_SPEED;
@@ -209,23 +221,23 @@ function App() {
           pvy = (pvy / m) * PLAYER_SPEED;
         }
       }
-      let newPx = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
-      let newPy = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
-      // Obstacle collision
+      let newPx = clamp(p.x + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
+      let newPy = clamp(p.y + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
+      // Obstacle collision: only move if not blocked
       if (!checkCollisionWithObstacles(newPx, newPy)) {
-        px = newPx;
-        py = newPy;
+        p.x = newPx;
+        p.y = newPy;
       }
 
       // ----- Calculate bot speed by level -----
       const currentBotSpeed = Math.min(
-        BOT_BASE_SPEED + BOT_SPEED_PER_LEVEL * (stateRef.level - 1),
+        BOT_BASE_SPEED + BOT_SPEED_PER_LEVEL * (level - 1),
         BOT_SPEED_CAP
       );
 
       // ----- Bots: Move toward player -----
-      let newBotsArr = stateRef.bots.map((bot) => {
-        let target = { x: px, y: py };
+      let botsAfterMove = botsArr.map((bot) => {
+        let target = { x: p.x, y: p.y }; // use latest player pos
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let distToTgt = Math.sqrt(dx * dx + dy * dy);
@@ -233,9 +245,10 @@ function App() {
         if (distToTgt > 3) {
           bvx = (dx / distToTgt) * currentBotSpeed;
           bvy = (dy / distToTgt) * currentBotSpeed;
-          // Try full move, then just x, then just y; fallback original
+          // Try full move, then just x, then just y; fallback: don't move
           let maybeBx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
           let maybeBy = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
+          // Use obstacle collision test (bots will "slide" or get stuck, as before)
           if (!checkCollisionWithObstacles(maybeBx, maybeBy, 0)) {
             return { ...bot, x: maybeBx, y: maybeBy };
           } else if (!checkCollisionWithObstacles(bot.x + bvx, bot.y, 0)) {
@@ -250,57 +263,58 @@ function App() {
             };
           }
         }
-        return bot;
+        return { ...bot };
       });
 
       // ----- FLAG PICKUP LOGIC -----
-      let newFlag = { ...stateRef.flag };
-      let showDropoffNow = stateRef.dropoffBox;
+      // Show new dropoff box exactly once per pickup (and if flag not held by player)
+      let flagNext = { ...flagVal };
+      let dropoffCreated = false;
       if (
-        !stateRef.flag.heldBy &&
-        dist(px, py, stateRef.flag.x, stateRef.flag.y) <
-          (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
+        !flagNext.heldBy &&
+        dist(p.x, p.y, flagNext.x, flagNext.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
       ) {
-        newFlag.heldBy = "player";
-        newFlag.home = false;
-        setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
-        showDropoffNow = true;
+        flagNext.heldBy = "player";
+        flagNext.home = false;
+        box = randomDropoffBox(CANVAS_W, CANVAS_H);
+        dropoffCreated = true;
       }
 
       // Bot catches player?
       let gameOverByAICatch = false;
-      newBotsArr.forEach((bot) => {
-        if (dist(px, py, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
+      botsAfterMove.forEach((bot) => {
+        if (dist(p.x, p.y, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
           gameOverByAICatch = true;
         }
       });
 
-      // Player win condition
+      // Player win condition (deliver flag to dropoff)
       let playerScored = false;
       if (
-        newFlag.heldBy === "player" &&
-        stateRef.dropoffBox &&
-        dist(px, py, stateRef.dropoffBox.x, stateRef.dropoffBox.y) <
-          (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
+        flagNext.heldBy === "player" &&
+        box &&
+        dist(p.x, p.y, box.x, box.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
       ) {
         playerScored = true;
       }
 
-      let newPlayer = { ...stateRef.player, x: px, y: py };
-      let updatedBots = newBotsArr;
-      let newPlayerScore = stateRef.player.score;
-      let newBotScores = stateRef.bots.map((b) => b.score);
+      let playerObj = { ...p };   // preserve only position here
+      let botsOut = botsAfterMove.map((b) => ({ ...b }));
+      let playerScoreNext = playerRef.current ? playerRef.current.score : player.score;
+      let botScoresArr = botsRef.current ? botsRef.current.map((b) => b.score) : bots.map((b) => b.score);
 
+      // Update scores
       if (playerScored) {
-        newPlayerScore += stateRef.level;
-        setDropoffBox(null);
+        playerScoreNext += level;
+        box = null; // hide dropoff!
       } else {
-        if (newFlag.heldBy === "player") {
-          newFlag.x = px;
-          newFlag.y = py;
+        if (flagNext.heldBy === "player") {
+          flagNext.x = p.x;
+          flagNext.y = p.y;
         }
       }
 
+      // Check win/lose/gameover
       let gameOver = false;
       let newWinner = null;
       let endMsg = "";
@@ -313,13 +327,15 @@ function App() {
         setLevelCompleted(true);
         setGamestate("levelcomplete");
         setRunning(false);
-        setMessage(
-          `Flag delivered! +${stateRef.level} point${stateRef.level > 1 ? "s" : ""}.`
-        );
+        setMessage(`Flag delivered! +${level} point${level > 1 ? "s" : ""}.`);
         setWinner("player");
+        setPlayer({ ...playerObj, score: playerScoreNext });
+        setBots((prev) => botsOut.map((b, i) => ({ ...b, score: botScoresArr[i] })));
+        setFlag(flagNext);
+        setDropoffBox(null);
         return;
       }
-      if (Math.max(...newBotScores) >= 3) {
+      if (Math.max(...botScoresArr) >= 3) {
         gameOver = true;
         newWinner = "bot";
         endMsg = "Bots win! Try again!";
@@ -334,14 +350,24 @@ function App() {
         setMessage("");
       }
 
-      setPlayer((p) => ({ ...newPlayer, score: newPlayerScore }));
-      setBots((prev) =>
-        prev.map((b, i) => ({ ...updatedBots[i], score: newBotScores[i] }))
-      );
-      setFlag(newFlag);
+      // Write world state back to React
+      setPlayer((prev) => ({
+        ...playerObj,
+        score: playerScoreNext // preserve highest up-to-date score
+      }));
+      setBots((prev) => botsOut.map((b, i) => ({
+        ...b,
+        score: botScoresArr[i]
+      })));
+      setFlag(flagNext);
+      if (dropoffCreated) {
+        setDropoffBox(box);
+      }
 
-      if (!gameOver && stateRef.gamestate === "running")
+      // Continue animation loop if still running
+      if (!gameOver && gamestate === "running") {
         anim = requestAnimationFrame(gameTick);
+      }
     }
 
     if (gamestate === "running") {
@@ -351,7 +377,7 @@ function App() {
       if (anim) cancelAnimationFrame(anim);
     };
     // eslint-disable-next-line
-  }, [gamestate]);
+  }, [gamestate, obstacles, level]);
 
   // --- DRAW: Core canvas rendering only, NO hazard visuals ---
   useEffect(() => {
