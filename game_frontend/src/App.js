@@ -534,54 +534,56 @@ function App() {
           </div>
 
           <section>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                minHeight: 430,
-                marginBottom: 5,
-                marginTop: 5,
-              }}
-            >
-              <canvas
-                ref={gameCanvasRef}
-                width={GAME_WIDTH}
-                height={GAME_HEIGHT}
+            <div>
+              <div
                 style={{
-                  boxShadow: "0 4px 24px 0 rgba(33,150,243,0.07)",
-                  borderRadius: 16,
-                  border: `2px solid ${COLORS.primary}`,
-                  background: COLORS.field,
-                  outline: "none",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  minHeight: 430,
+                  marginBottom: 5,
+                  marginTop: 5,
                 }}
-                tabIndex={0}
-              />
-            </div>
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              margin: "6px 0 6px 0",
-              fontSize: 16,
-              alignItems: "center",
-              color: COLORS.text,
-            }}>
-              <span>
-                <b>⏰</b>{" "}
-                {`${Math.floor(time / 60)
-                  .toString()
-                  .padStart(2, "0")}:${(time % 60).toString().padStart(2, "0")}`}
-              </span>
-              <span style={{fontSize:15, color: "#989898"}}>
-                {isRunning ? (
-                  <span>
-                    <b>Move</b>: [WASD] or [Arrow Keys] <span style={{marginLeft:8}}>| <b>Objective</b>: Bring the bot's flag to your base!
-                  </span>
-                ) : winner ? <b>Game Over!</b> : "Press Start to Play!"}
-              </span>
-              <span>
-                <b>Round:</b> 1
-              </span>
+              >
+                <canvas
+                  ref={gameCanvasRef}
+                  width={GAME_WIDTH}
+                  height={GAME_HEIGHT}
+                  style={{
+                    boxShadow: "0 4px 24px 0 rgba(33,150,243,0.07)",
+                    borderRadius: 16,
+                    border: `2px solid ${COLORS.primary}`,
+                    background: COLORS.field,
+                    outline: "none",
+                  }}
+                  tabIndex={0}
+                />
+              </div>
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                margin: "6px 0 6px 0",
+                fontSize: 16,
+                alignItems: "center",
+                color: COLORS.text,
+              }}>
+                <span>
+                  <b>⏰</b>{" "}
+                  {`${Math.floor(time / 60)
+                    .toString()
+                    .padStart(2, "0")}:${(time % 60).toString().padStart(2, "0")}`}
+                </span>
+                <span style={{fontSize:15, color: "#989898"}}>
+                  {isRunning ? (
+                    <span>
+                      <b>Move</b>: [WASD] or [Arrow Keys] <span style={{marginLeft:8}}>| <b>Objective</b>: Bring the bot's flag to your base!
+                    </span>
+                  ) : winner ? <b>Game Over!</b> : "Press Start to Play!"}
+                </span>
+                <span>
+                  <b>Round:</b> 1
+                </span>
+              </div>
             </div>
           </section>
           <div
