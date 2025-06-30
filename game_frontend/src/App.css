@@ -1,0 +1,106 @@
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --text-primary: #263238;
+  --primary: #2196f3;
+  --secondary: #43a047;
+  --accent: #ff9800;
+  --border-color: #e9ecef;
+  --button-bg: #2196f3;
+  --button-text: #ffffff;
+}
+
+.App {
+  min-height: 100vh;
+  text-align: center;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+}
+
+header {
+  width: 100%;
+  background: var(--bg-secondary);
+  box-shadow: 0 2px 12px 0 rgba(33,150,243,0.025);
+}
+
+.game-btn {
+  background: var(--button-bg);
+  color: var(--button-text);
+  padding: 12px 34px;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px rgba(33,150,243,0.09);
+  cursor: pointer;
+  outline: none;
+  transition: background 0.20s, transform 0.08s;
+}
+.game-btn:active {
+  transform: scale(0.94);
+  background: #1769aa;
+}
+.game-btn:hover {
+  background: #1976d2;
+}
+
+canvas:focus {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+li {
+  margin-bottom: 4px;
+  color: #444;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  background: #e9ecef;
+}
+::-webkit-scrollbar-thumb {
+  background: #b0c4d8;
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) {
+  .App {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 700px) {
+  .App {
+    font-size: 15px;
+  }
+  canvas {
+    width: 95vw !important;
+    height: 290px !important;
+  }
+  header h1 {
+    font-size: 22px !important;
+  }
+}
+
+@media (max-width: 500px) {
+  .App {
+    font-size: 13px;
+  }
+  canvas {
+    width: 98vw !important;
+    height: 220px !important;
+  }
+  header h1 {
+    font-size: 17px !important;
+  }
+}
+
+/* Extra: Hide number input spinner in some browsers */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
