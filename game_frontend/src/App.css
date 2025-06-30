@@ -288,12 +288,30 @@ input[type=number] { -moz-appearance: textfield; }
 }
 
 .game-canvas-panel .continue-btn {
-  position: absolute;
-  left: 50%;
-  bottom: 17%;
-  transform: translateX(-50%);
-  z-index: 23;
-  font-size: 1.21rem;
+  position: static;
+  margin: 32px auto 0 auto;
+  display: block;
+  z-index: 25;
+  font-size: 1.7rem;
+  min-width: 190px;
+  min-height: 58px;
+  padding: 18px 56px;
+  background: linear-gradient(92deg,#368dff 45%,#ffb021 97%);
+  color: #fff;
+  border: 0;
+  border-radius: 17px;
+  box-shadow: 0 7px 38px 2px #ffb78057, 0 2px 8px #368dffa5;
+  font-family: 'Orbitron','Exo',Arial,sans-serif;
+  font-weight: 900;
+  letter-spacing: .15em;
+  transition: transform 0.15s, box-shadow 0.17s, background 0.2s;
+}
+.game-canvas-panel .continue-btn:hover,
+.game-canvas-panel .continue-btn:focus {
+  background: linear-gradient(92deg,#49b2ff 25%,#45f7c4 92%) !important;
+  color: #222;
+  outline: 2.2px solid #39ffd577;
+  transform: scale(1.06);
 }
 
 /* Controls info panel */

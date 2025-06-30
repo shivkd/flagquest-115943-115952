@@ -13,8 +13,8 @@ import "./App.css";
  * - Custom constants for scalable bot speed and new visuals
  */
 
-const CANVAS_W = 420;
-const CANVAS_H = 300;
+const CANVAS_W = 640;   // Increased canvas width for a more immersive play area
+const CANVAS_H = 440;   // Increased canvas height for a more immersive play area
 const PLAYER_SIZE = 26;
 const BOT_SIZE = 26;
 const FLAG_SIZE = 18;
@@ -162,39 +162,53 @@ function App() {
     // eslint-disable-next-line
   }, []);
 
-    // Main game loop (fixed timestep; updating state and drawing)
+    // Main game loop (more optimal: only re-subscribe on essential state changes)
   useEffect(() => {
     let anim;
-    let prevTimestamp = performance.now();
+    let lastTime = performance.now();
+
+    // Using refs to hold latest state to avoid heavy dependency lists and stutter
+    const stateRef = {
+      player: { ...player },
+      bots: [...bots],
+      flag: { ...flag },
+      dropoffBox,
+      gamestate,
+      level,
+      obstacles: [...obstacles],
+      winner,
+    };
 
     function checkCollisionWithObstacles(x, y, margin = 4) {
-      // Returns true if (x,y) would "hit" any obstacle
-      return obstacles.some(
-        (o) => Math.abs(o.x - x) < (OBSTACLE_SIZE/2 + PLAYER_SIZE/2 + margin) &&
-               Math.abs(o.y - y) < (OBSTACLE_SIZE/2 + PLAYER_SIZE/2 + margin)
+      return stateRef.obstacles.some(
+        (o) =>
+          Math.abs(o.x - x) < OBSTACLE_SIZE / 2 + PLAYER_SIZE / 2 + margin &&
+          Math.abs(o.y - y) < OBSTACLE_SIZE / 2 + PLAYER_SIZE / 2 + margin
       );
     }
 
-    function gameTick(timestamp) {
-      if (gamestate !== "running") return;
-      let delta = timestamp - prevTimestamp;
-      prevTimestamp = timestamp;
+    function dist(x1, y1, x2, y2) {
+      return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+    }
+
+    function gameTick(now) {
+      if (stateRef.gamestate !== "running") return;
+      let delta = Math.min(now - lastTime, 40); // Clamp to avoid spiral of death
+      lastTime = now;
 
       // PLAYER: apply controls
-      let [px, py] = [player.x, player.y];
-      let pvx = 0, pvy = 0;
+      let [px, py] = [stateRef.player.x, stateRef.player.y];
+      let pvx = 0,
+        pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
       if (keyState.current.down) pvy += PLAYER_SPEED;
       if (keyState.current.left) pvx -= PLAYER_SPEED;
       if (keyState.current.right) pvx += PLAYER_SPEED;
-      // Normalize so diagonals are not faster
       if (pvx !== 0 || pvy !== 0) {
         const m = Math.sqrt(pvx * pvx + pvy * pvy);
         pvx = (pvx / m) * PLAYER_SPEED;
         pvy = (pvy / m) * PLAYER_SPEED;
       }
-
-      // Simulate new position & collision
       let newPx = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
       let newPy = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
       if (!checkCollisionWithObstacles(newPx, newPy)) {
@@ -204,95 +218,90 @@ function App() {
 
       // --- Calculate bot speed for this level ---
       const currentBotSpeed = Math.min(
-        BOT_BASE_SPEED + BOT_SPEED_PER_LEVEL * (level - 1),
+        BOT_BASE_SPEED + BOT_SPEED_PER_LEVEL * (stateRef.level - 1),
         BOT_SPEED_CAP
       );
 
-      // --- Bots: Move toward the PLAYER (attack/chase only, never chase flag) ---
-      let newBots = bots.map((bot, i) => {
-        // Always attack the player directly
+      // --- Bots: Move toward the PLAYER (attack/chase only) ---
+      let newBotsArr = stateRef.bots.map((bot) => {
         let target = { x: px, y: py };
         let dx = target.x - bot.x;
         let dy = target.y - bot.y;
         let distToTgt = Math.sqrt(dx * dx + dy * dy);
-        let bvx = 0, bvy = 0;
+        let bvx = 0,
+          bvy = 0;
         if (distToTgt > 3) {
           bvx = (dx / distToTgt) * currentBotSpeed;
           bvy = (dy / distToTgt) * currentBotSpeed;
-          // Test bot update for collision too (but bots are dumber; try single axis if col)
-          let maybeBx = clamp(bot.x + bvx, BOT_SIZE/2, CANVAS_W-BOT_SIZE/2);
-          let maybeBy = clamp(bot.y + bvy, BOT_SIZE/2, CANVAS_H-BOT_SIZE/2);
+          let maybeBx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
+          let maybeBy = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
           if (!checkCollisionWithObstacles(maybeBx, maybeBy, 0)) {
             return { ...bot, x: maybeBx, y: maybeBy };
           } else if (!checkCollisionWithObstacles(bot.x + bvx, bot.y, 0)) {
-            return { ...bot, x: clamp(bot.x + bvx, BOT_SIZE/2, CANVAS_W-BOT_SIZE/2) };
+            return {
+              ...bot,
+              x: clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2),
+            };
           } else if (!checkCollisionWithObstacles(bot.x, bot.y + bvy, 0)) {
-            return { ...bot, y: clamp(bot.y + bvy, BOT_SIZE/2, CANVAS_H-BOT_SIZE/2) };
+            return {
+              ...bot,
+              y: clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2),
+            };
           }
         }
-        return bot; // Blocked
+        return bot;
       });
 
-      // Utility: Euclidean distance
-      function dist(x1, y1, x2, y2) {
-        return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-      }
+      // --- FLAG PICKUP LOGIC ---
+      let newFlag = { ...stateRef.flag };
+      let showDropoffNow = stateRef.dropoffBox;
 
-      // --- FLAG PICKUP AND INTERACTION LOGIC ---
-      // Only player can grab/carry the flag. Bots can no longer touch/hold/interact with the flag.
-      let newFlag = { ...flag };
-      let showDropoffNow = dropoffBox;
-
-      // -- Player picks up flag --
       if (
-        !flag.heldBy &&
-        dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
+        !stateRef.flag.heldBy &&
+        dist(px, py, stateRef.flag.x, stateRef.flag.y) <
+          (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
       ) {
         newFlag.heldBy = "player";
         newFlag.home = false;
-        // Generate a drop-off box at a random position (not too close to player start zone)
         setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
         showDropoffNow = true;
       }
 
-      // Collision detection: bots can "catch" the player if close enough (while player has/has not flag)
+      // Collision detection
       let gameOverByAICatch = false;
-      newBots.forEach((bot, i) => {
+      newBotsArr.forEach((bot) => {
         if (dist(px, py, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
           gameOverByAICatch = true;
         }
       });
 
-      // Player win condition: delivered flag
+      // Player win condition
       let playerScored = false;
       if (
         newFlag.heldBy === "player" &&
-        dropoffBox &&
-        dist(px, py, dropoffBox.x, dropoffBox.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
+        stateRef.dropoffBox &&
+        dist(px, py, stateRef.dropoffBox.x, stateRef.dropoffBox.y) <
+          (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
       ) {
         playerScored = true;
       }
 
-      // Reset flag on score, increment player score, remove drop-off box
-      let newPlayer = { ...player, x: px, y: py };
-      let updatedBots = newBots;
-      let newPlayerScore = player.score;
-      let newBotScores = bots.map((b) => b.score);
-      let postScoreMessage = "";
+      // Update player
+      let newPlayer = { ...stateRef.player, x: px, y: py };
+      let updatedBots = newBotsArr;
+      let newPlayerScore = stateRef.player.score;
+      let newBotScores = stateRef.bots.map((b) => b.score);
 
       if (playerScored) {
         newPlayerScore += 1;
-        postScoreMessage = "Flag delivered! +1 point.";
         setDropoffBox(null);
       } else {
-        // Carry flag with player if held
         if (newFlag.heldBy === "player") {
           newFlag.x = px;
           newFlag.y = py;
         }
       }
 
-      // End/game over/AI catch condition: first to 3 points or bot catches player
       let gameOver = false;
       let newWinner = null;
       let endMsg = "";
@@ -301,15 +310,14 @@ function App() {
         newWinner = "bot";
         endMsg = "You were caught by a bot!";
       }
-      // NEW: Level completes and "Continue" pops up as soon as player earns 1 point by delivering flag
+      // Level completion triggers
       if (playerScored) {
-        // Immediately trigger level completion and allow progression
         setLevelCompleted(true);
         setGamestate("levelcomplete");
         setRunning(false);
         setMessage("Flag delivered! +1 point.");
         setWinner("player");
-        return; // stop loop, do not allow additional progress until Continue
+        return;
       }
       if (Math.max(...newBotScores) >= 3) {
         gameOver = true;
@@ -326,7 +334,6 @@ function App() {
         setMessage("");
       }
 
-      // Update all state
       setPlayer((p) => ({ ...newPlayer, score: newPlayerScore }));
       setBots((prev) =>
         prev.map((b, i) => ({ ...updatedBots[i], score: newBotScores[i] }))
@@ -343,7 +350,7 @@ function App() {
       if (anim) cancelAnimationFrame(anim);
     };
     // eslint-disable-next-line
-  }, [gamestate, running, player, bots, flag, dropoffBox, level, obstacles]);
+  }, [gamestate]);
 
   // Draw canvas game area
   useEffect(() => {
@@ -625,7 +632,7 @@ function App() {
   };
 
   // Pass autoStart=true for hotkey restart-and-autostart
-  const handleRestart = (autoStart = false) => {
+  const handleRestart = useCallback((autoStart = false) => {
     // Always reset obstacles for first level, and bots
     setObstacles(randomObstacles(0));
     setNumBots(BASE_NUM_BOTS);
@@ -655,12 +662,21 @@ function App() {
       setGamestate("ready");
       setRunning(false);
     }
-  };
+  }, []);
 
   // Handle continue to next level after level-completed UI
   const handleContinueLevel = useCallback(() => {
+    // Cap maximum level at 10
+    if (level >= 10) {
+      setLevelCompleted(false);
+      setGamestate("over");
+      setWinner("player");
+      setMessage("Congratulations! You've beaten all 10 levels!");
+      setRunning(false);
+      return;
+    }
     // Advance to next level!
-    const nextLevel = level + 1;
+    const nextLevel = Math.min(level + 1, 10);
     const newNumBots = BASE_NUM_BOTS + (nextLevel-1) * BOT_INCREASE_RATE;
     const newObstacles = randomObstacles((nextLevel-1) * OBSTACLE_INCREASE_RATE);
     setLevel(nextLevel);
@@ -778,8 +794,10 @@ function App() {
             // Allow for keyboard hotkeys if needed
           }}
           style={{
-            width: `${CANVAS_W + 30}px`,
-            height: `${CANVAS_H + 40}px`
+            width: Math.max(440, CANVAS_W + 40),
+            height: Math.max(320, CANVAS_H + 48),
+            maxWidth: "99vw",
+            maxHeight: "99vh"
           }}
         >
           <canvas
@@ -822,10 +840,10 @@ function App() {
           )}
           {/* Level Complete Overlay */}
           {levelCompleted && (
-            <div className="game-overlay-panel victory" tabIndex={0}>
-              <h2>Level {level} Complete!</h2>
-              <div className="desc">
-                Congratulations! Continue to next level.<br />
+            <div className="game-overlay-panel victory" tabIndex={0} style={{display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center"}}>
+              <h2 style={{marginBottom: "11px"}}>Level {level} Complete!</h2>
+              <div className="desc" style={{marginBottom: "24px"}}>
+                Congratulations! Continue to next level.
               </div>
               <button
                 className="game-btn continue-btn"
