@@ -241,6 +241,11 @@ function App() {
       let bombsArr = bombsRef.current ? bombsRef.current.map((b) => ({...b})) : [];
       let lasersArr = lasersRef.current ? lasersRef.current.map(l => ({...l})) : [];
 
+      // -----
+      // Ensure playerScored is declared at function scope top for use in hazard gating and win logic
+      // -----
+      let playerScored = false;
+
       // ----- PLAYER PHYSICS (identical, unless stunned by hazards) -----
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
@@ -515,7 +520,6 @@ function App() {
       });
 
       // Player win condition (deliver flag to dropoff)
-      let playerScored = false;
       if (
         flagNext.heldBy === "player" &&
         box &&
