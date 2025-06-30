@@ -1,6 +1,31 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import "./App.css";
 
+/** 
+ * Seeded pseudo-random number generator (Mulberry32)
+ * (https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript)
+ */
+function seededPRNG(seed) {
+  let t = seed;
+  return function () {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/** Generate a random integer (>= min, < max) using prng */
+function seededRandomBetween(prng, a, b) {
+  return prng() * (b - a) + a;
+}
+function seededRandomInt(prng, a, b) {
+  return Math.floor(seededRandomBetween(prng, a, b));
+}
+/** Utility: get an integer seed from Date.now() and some system randomness for new level */
+function uniqueSeed() {
+  return (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
+}
+
 /**
  * FlagQuest App: Minimal 2D capture-the-flag game – original, pre-hazard movement logic restored.
  * - Handles player movement, bot AI, flag pickup, dropoff, basic scoring, game state.
@@ -91,12 +116,80 @@ function randomObstacles(numObstacles = 0) {
  * Main game component. Adds hazard state and hazard management.
  */
 function App() {
-  // Game state
+  // --- LEVEL SEED MANAGEMENT ---
+  // We'll store a [seed, setSeed] to be used for re-randomization at each level; 
+  // This seed is set ONCE at level/setup, and reused for all random ops on restart.
   const [level, setLevel] = useState(1);
+  // Each level (and each time new level or new run, not restart) gets a new levelSeed
+  const [levelSeed, setLevelSeed] = useState(() => uniqueSeed());
+  const [randStateAtGen, setRandStateAtGen] = useState(null); // serializable for advanced RNG, reserved (unused here, API stub)
+
+  // We make a local PRNG for all random layouts - obstacles, bots, flag, and hazards on that level - seeded by levelSeed
+  function createLevelPRNG(seed = levelSeed) {
+    return seededPRNG(seed);
+  }
+
+  // All factories now deterministic for a given PRNG
+  function randomPosPRNG(prng, w, h, margin = 18) {
+    return {
+      x: seededRandomBetween(prng, margin, w - margin),
+      y: seededRandomBetween(prng, margin, h - margin),
+    };
+  }
+  function randomDropoffBoxPRNG(prng, w, h, margin = 40) {
+    let pos;
+    let tries = 0;
+    do {
+      pos = randomPosPRNG(prng, w, h, margin);
+      tries++;
+    } while (pos.x < CANVAS_W / 3 && tries < 20);
+    return pos;
+  }
+  function randomObstaclesPRNG(prng, numObstacles = 0) {
+    if (numObstacles === 0) return [];
+    let obs = [];
+    for (let i = 0; i < numObstacles; i++) {
+      let pos;
+      let tries = 0;
+      do {
+        pos = randomPosPRNG(prng, CANVAS_W, CANVAS_H, 38);
+        tries++;
+      } while (
+        (pos.x < 80 && Math.abs(pos.y - CANVAS_H / 2) < 60) ||
+        obs.some(
+          (o) =>
+            Math.abs(o.x - pos.x) < OBSTACLE_SIZE &&
+            Math.abs(o.y - pos.y) < OBSTACLE_SIZE
+        ) ||
+        tries > 20
+      );
+      obs.push(pos);
+    }
+    return obs;
+  }
+  function randomBotsPRNG(prng, num = BASE_NUM_BOTS) {
+    // All bots have starting positions offset by idx, like before, but if desired randomize start/AI offset
+    return Array.from({ length: num }, (_, idx) => ({
+      id: idx + 1,
+      x: CANVAS_W - 50 - idx * 30,
+      y: (2 * CANVAS_H) / 3 - idx * 30,
+      dx: 0,
+      dy: 0,
+      score: 0,
+    }));
+  }
+  function randomFlagPRNG(prng) {
+    return { ...randomPosPRNG(prng, CANVAS_W, CANVAS_H), heldBy: null, home: true };
+  }
+
+  // ---- Game state
   const [numBots, setNumBots] = useState(BASE_NUM_BOTS);
-  const [obstacles, setObstacles] = useState(() =>
-    randomObstacles((level - 1) * OBSTACLE_INCREASE_RATE)
-  );
+
+  // Obstacles, bots, flag are set using PRNG seeded by levelSeed
+  const [obstacles, setObstacles] = useState(() => {
+    const prng = createLevelPRNG();
+    return randomObstaclesPRNG(prng, (level - 1) * OBSTACLE_INCREASE_RATE);
+  });
   const [player, setPlayer] = useState({
     x: 60,
     y: CANVAS_H / 2,
@@ -104,21 +197,14 @@ function App() {
     dy: 0,
     score: 0,
   });
-  const [bots, setBots] = useState(() =>
-    Array.from({ length: BASE_NUM_BOTS }, (_, idx) => ({
-      id: idx + 1,
-      x: CANVAS_W - 50 - idx * 30,
-      y: (2 * CANVAS_H) / 3 - idx * 30,
-      dx: 0,
-      dy: 0,
-      score: 0,
-    }))
-  );
-  const [flag, setFlag] = useState(() => ({
-    ...randomPos(CANVAS_W, CANVAS_H),
-    heldBy: null,
-    home: true,
-  }));
+  const [bots, setBots] = useState(() => {
+    const prng = createLevelPRNG();
+    return randomBotsPRNG(prng, BASE_NUM_BOTS);
+  });
+  const [flag, setFlag] = useState(() => {
+    const prng = createLevelPRNG();
+    return randomFlagPRNG(prng);
+  });
   const [dropoffBox, setDropoffBox] = useState(null);
 
   /****** Hazard environment (bombs & lasers) *****/
@@ -1016,35 +1102,28 @@ function App() {
   // PUBLIC_INTERFACE
   const handleRestart = useCallback(
     (autoStart = false) => {
-      // Game should restart at the current level. 
-      // Compute bots and obstacles scaling for the current level.
+      // Always use the saved levelSeed; reset random elements to the *same* as initial for this seed/level
+      // Bots, obstacles, flag, hazards, everything as generated for the seed
+      const prng = createLevelPRNG(levelSeed);
       const activeLevel = level;
 
       const numBotsForLevel = BASE_NUM_BOTS + (activeLevel - 1) * BOT_INCREASE_RATE;
-      const obstaclesForLevel = randomObstacles((activeLevel - 1) * OBSTACLE_INCREASE_RATE);
+      const obstaclesForLevel = randomObstaclesPRNG(prng, (activeLevel - 1) * OBSTACLE_INCREASE_RATE);
+      // Note, bots are not truly random in the default version, but preserve structure for future extension
+      const botsForLevel = randomBotsPRNG(prng, numBotsForLevel);
+      const flagForLevel = randomFlagPRNG(prng);
 
       setNumBots(numBotsForLevel);
       setObstacles(obstaclesForLevel);
-
       setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
-
-      setBots(
-        Array.from({ length: numBotsForLevel }, (_, idx) => ({
-          id: idx + 1,
-          x: CANVAS_W - 50 - idx * 30,
-          y: (2 * CANVAS_H) / 3 - idx * 30,
-          dx: 0,
-          dy: 0,
-          score: 0,
-        }))
-      );
-      setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
+      setBots(botsForLevel);
+      setFlag(flagForLevel);
       setDropoffBox(null);
       setTimer(TIMER_DURATION);
       setWinner(null);
       setMessage("");
       setLevelCompleted(false);
-      // DO NOT reset setLevel here - preserve the current level!
+      // DO NOT reset setLevel here - preserve the current level (levelSeed)!
       setBombs([]); // clear hazards on restart
       setLasers([]);
       bombNextTimerRef.current = 0;
@@ -1058,31 +1137,26 @@ function App() {
         setRunning(false);
       }
     },
-    [level]
+    [level, levelSeed]
   );
 
   // Level-up: advance to next level
   const handleContinueLevel = useCallback(() => {
     const nextLevel = level + 1;
+    const newSeed = uniqueSeed(); // Generate a new unique seed for this new level, so every level is reproducible but unique
+    const prng = seededPRNG(newSeed);
     const newNumBots = BASE_NUM_BOTS + (nextLevel - 1) * BOT_INCREASE_RATE;
-    const newObstacles = randomObstacles((nextLevel - 1) * OBSTACLE_INCREASE_RATE);
+    const newObstacles = randomObstaclesPRNG(prng, (nextLevel - 1) * OBSTACLE_INCREASE_RATE);
+    const newBots = randomBotsPRNG(prng, newNumBots);
+    const newFlag = randomFlagPRNG(prng);
 
     setLevel(nextLevel);
+    setLevelSeed(newSeed);
     setNumBots(newNumBots);
     setObstacles(newObstacles);
-
     setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
-    setBots(
-      Array.from({ length: newNumBots }, (_, idx) => ({
-        id: idx + 1,
-        x: CANVAS_W - 50 - idx * 30,
-        y: (2 * CANVAS_H) / 3 - idx * 30,
-        dx: 0,
-        dy: 0,
-        score: 0,
-      }))
-    );
-    setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
+    setBots(newBots);
+    setFlag(newFlag);
     setDropoffBox(null);
     setTimer(TIMER_DURATION);
     setWinner(null);
@@ -1102,6 +1176,13 @@ function App() {
   }, [level]);
 
   // Auto-focus panel ref whenever entering running state after overlays
+  // Reset the seed if this is ever a fresh game (entering new game, not a restart), only if levelSeed is null/undefined (safety)
+  useEffect(() => {
+    if ((levelSeed === null || levelSeed === undefined) && (gamestate === "ready" || gamestate === "running")) {
+      setLevelSeed(uniqueSeed());
+    }
+  }, [levelSeed, gamestate]);
+
   useEffect(() => {
     if (gamestate === "running" && panelRef.current) {
       panelRef.current.focus();
