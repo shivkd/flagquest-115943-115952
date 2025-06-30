@@ -300,7 +300,8 @@ function App() {
       let newBotScores = stateRef.bots.map((b) => b.score);
 
       if (playerScored) {
-        newPlayerScore += 1;
+        // AWARD points equal to current level on flag delivery.
+        newPlayerScore += stateRef.level;
         setDropoffBox(null);
       } else {
         if (newFlag.heldBy === "player") {
@@ -322,7 +323,7 @@ function App() {
         setLevelCompleted(true);
         setGamestate("levelcomplete");
         setRunning(false);
-        setMessage("Flag delivered! +1 point.");
+        setMessage(`Flag delivered! +${stateRef.level} point${stateRef.level > 1 ? "s" : ""}.`);
         setWinner("player");
         return;
       }
