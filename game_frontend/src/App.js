@@ -7,13 +7,18 @@ import "./App.css";
   and ensures bullets spawn from player and fire in current/last direction moved.
 */
 
+/*
+  Enhance core gameplay: 'R' reliably restarts, player running animation, bigger/cooler flag, shots trigger from player center and direction always.
+*/
+
 // ---- Constants ---- 
 const CANVAS_W = 440;
 const CANVAS_H = 320;
 
+// Player, Bot, and Flag sizing - updated for bigger flag per request
 const PLAYER_SIZE = 24;
 const BOT_SIZE = 24;
-const FLAG_SIZE = 18;
+const FLAG_SIZE = 30; // was 18; now visually bigger and more prominent!
 const PLAYER_SPEED = 3.2;
 const BASE_BOT_SPEED = 2.1;
 const FLAG_ZONE_RADIUS = 34;
@@ -180,7 +185,7 @@ function App() {
     return () => clearInterval(t);
   }, [running, timer]);
 
-  // --- Keyboard controls ---
+  // --- Keyboard controls + Reliable R-key Restart ---
   useEffect(() => {
     function handleDown(e) {
       // Movement keys
@@ -191,6 +196,16 @@ function App() {
       if (e.key === "p" || e.key === "P") { if (running) handlePause(); }
       // Shoot (J, K, Z) or mouse
       if (["j", "J", "k", "K", "z", "Z"].includes(e.key)) { shootBullet(); }
+      // -- R to restart level/game always
+      if (e.key === "r" || e.key === "R") {
+        // If in level completed/failed, restart at current. Otherwise restart whole game
+        if (showLevelCompleted || showLevelFailed || gamestate === "failed" || gamestate === "postlevel") {
+          handleRestart(true, { restartAtCurrentLevel: true });
+          setShowLevelCompleted(false); setShowLevelFailed(false);
+        } else {
+          handleRestart(true, { restartAtCurrentLevel: false });
+        }
+      }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -211,7 +226,7 @@ function App() {
     };
     // DO NOT add player to deps
     // eslint-disable-next-line
-  }, [player.canShoot, running]);
+  }, [player.canShoot, running, showLevelCompleted, showLevelFailed, gamestate]); // depend on all so effect works reliably
 
   // --- Main game loop (player, bots, flag, bullets, collisions) ---
   useEffect(() => {
@@ -394,6 +409,7 @@ function App() {
   function shootBullet() {
     // Gun cooldown (350ms)
     if (!player.canShoot || !running) return;
+    // Make sure bullet ALWAYS spawns at player's body and in correct direction (even during running animation)
     let px = player.x, py = player.y;
     // DIRECTION:
     // If moving, shoot in that direction. If standing, shoot in last moved direction.
@@ -406,7 +422,7 @@ function App() {
     let mag = Math.sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y) || 1;
     let dir = { x: moveDir.x / mag, y: moveDir.y / mag };
     let vx = dir.x * 8.7, vy = dir.y * 8.7;
-    // Bullet spawns at player center
+    // Bullet spawns at exact body center (reflects running arm/leg visually—but for clean gameplay, always from body)
     setBullets(bu => [
       ...bu,
       {
@@ -493,7 +509,7 @@ function App() {
   const botTopScore = Math.max(0, ...bots.map(b => b.score));
   let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
 
-  // ---- CANVAS RENDER LOGIC (minimal version ----
+  // ---- CANVAS RENDER LOGIC (with player running animation + bigger flag/shot origins) ----
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -531,27 +547,66 @@ function App() {
       ctx.restore();
     }
 
-    // Draw flag (free-standing)
+    // Draw flag (free-standing or player-held, bigger/scifi-cooler)
     if (flag && !flag.heldBy) {
       ctx.save();
       ctx.translate(flag.x, flag.y);
+      // Big shadow for sci-fi effect
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.ellipse(0, FLAG_SIZE * 0.34, FLAG_SIZE * 0.51, FLAG_SIZE * 0.21, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#ead730";
+      ctx.shadowColor = "#ffe576";
+      ctx.shadowBlur = 13;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      // Cartoon flag staff
+      ctx.save();
+      ctx.lineWidth = 3.6;
+      ctx.strokeStyle = "#23264d";
+      ctx.beginPath();
+      ctx.moveTo(-FLAG_SIZE*0.34, -FLAG_SIZE/2+6);
+      ctx.lineTo(-FLAG_SIZE*0.34, FLAG_SIZE*0.4);
+      ctx.stroke();
+      ctx.restore();
+      
+      // Sci-fi glowing main flag blob
       ctx.beginPath();
       ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
       ctx.fillStyle = CLR_ACC;
+      ctx.shadowColor = "#ffe576";
+      ctx.shadowBlur = 16;
+      ctx.globalAlpha = 0.94;
       ctx.fill();
-      ctx.lineWidth = 2.1;
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2.7;
       ctx.strokeStyle = "#ffe576";
       ctx.stroke();
-      // Emoji flag as marker
-      ctx.font = "bold 18px Arial";
-      ctx.fillStyle = "#303865";
-      ctx.globalAlpha = 0.97;
-      ctx.fillText("🏳️", 0, 5);
+
+      // Layer: stylized cartoon flag (emoji plus trail)
+      ctx.save();
+      ctx.font = "bold 25px Arial";
+      ctx.textAlign = "center";
+      ctx.globalAlpha = 0.99;
+      ctx.fillStyle = "#23264d";
+      ctx.rotate(-0.08);
+      ctx.fillText("🏳️", 4, 10);
+      // Sparkle trail (cartoony)
+      ctx.globalAlpha = 0.58;
+      ctx.beginPath();
+      ctx.moveTo(8, 3); ctx.lineTo(17, 7.6); ctx.lineWidth = 2.2;
+      ctx.strokeStyle = "#ffe3ab";
+      ctx.stroke();
       ctx.globalAlpha = 1;
+      ctx.restore();
       ctx.restore();
     }
 
-    // Draw bullets (blaster shots, yellow dots)
+    // Draw bullets (blaster shots, yellow dots) - (no change vs original)
     for (const bullet of bullets) {
       ctx.save();
       ctx.beginPath();
@@ -740,9 +795,19 @@ function App() {
       ctx.restore();
     }
 
-    // --- Draw PLAYER (complex friendly sci-fi android/hero-bot style, unique)
+    // --- Draw PLAYER (sci-fi android/hero-bot, running animation + arms/legs swing) ---
     ctx.save();
     ctx.translate(player.x, player.y);
+
+    // Figure running state: if moving, animate, else idle
+    const now = performance.now();
+    const moving = Math.abs(player.dx) > 0.1 || Math.abs(player.dy) > 0.1 ||
+      (keyState.current.up || keyState.current.down || keyState.current.left || keyState.current.right);
+    // Use time-based animation so animation continues even when idle at last-move
+    const runPhase = moving ? (now / 110) % (2 * Math.PI) : 0;
+    // Set for use in animation
+    const armSwing = moving ? Math.sin(runPhase) * 9.5 : 0;
+    const legSwing = moving ? Math.sin(runPhase + Math.PI) * 9.5 : 0;
 
     // Drop Shadow, larger and softer
     ctx.save();
@@ -849,35 +914,35 @@ function App() {
     ctx.stroke();
     ctx.restore();
 
-    // -- Arms (chubby metallic limbs with accent detail)
+    // -- ARMS: animate for running
     ctx.save();
     ctx.lineWidth = 5.2;
     ctx.strokeStyle = "#93eaff";
     ctx.beginPath();
-    // Left Arm
-    ctx.moveTo(-PLAYER_SIZE/2+2, 0);
-    ctx.lineTo(-PLAYER_SIZE/2-7, 7);
+    // Left Arm, swings back when right leg is forward and vice versa
+    ctx.moveTo(-PLAYER_SIZE / 2 + 2, 0);
+    ctx.lineTo(-PLAYER_SIZE / 2 - 7, 7 + armSwing);
     // Right Arm
-    ctx.moveTo(PLAYER_SIZE/2-2, 0);
-    ctx.lineTo(PLAYER_SIZE/2+7, 7);
+    ctx.moveTo(PLAYER_SIZE / 2 - 2, 0);
+    ctx.lineTo(PLAYER_SIZE / 2 + 7, 7 - armSwing);
     ctx.stroke();
 
-    // Arm fingerprints
+    // Arm fingerprints (static, end of limb)
     ctx.lineWidth = 2.1;
     ctx.strokeStyle = "#ffd44d";
     ctx.beginPath();
-    ctx.moveTo(-PLAYER_SIZE/2-6, 7);
-    ctx.lineTo(-PLAYER_SIZE/2-4, 8.9);
-    ctx.moveTo(PLAYER_SIZE/2+6, 7);
-    ctx.lineTo(PLAYER_SIZE/2+4, 8.9);
+    ctx.moveTo(-PLAYER_SIZE / 2 - 6, 7 + armSwing);
+    ctx.lineTo(-PLAYER_SIZE / 2 - 4, 8.9 + armSwing);
+    ctx.moveTo(PLAYER_SIZE / 2 + 6, 7 - armSwing);
+    ctx.lineTo(PLAYER_SIZE / 2 + 4, 8.9 - armSwing);
     ctx.stroke();
     ctx.restore();
 
-    // -- Wheeled track base/"feet"
+    // -- LEGS (running: wheel bases "bounce" forward/back per leg swing)
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(-5.5, PLAYER_SIZE/2-2.5, 3.5, 1.7, 0.12, 0, Math.PI*2);
-    ctx.ellipse(5.5, PLAYER_SIZE/2-2.5, 3.5, 1.7, -0.12, 0, Math.PI*2);
+    ctx.ellipse(-5.5, PLAYER_SIZE / 2 - 2.5 + legSwing * 0.13, 3.5, 1.7, 0.12, 0, Math.PI * 2);
+    ctx.ellipse(5.5, PLAYER_SIZE / 2 - 2.5 - legSwing * 0.13, 3.5, 1.7, -0.12, 0, Math.PI * 2);
     ctx.fillStyle = "#27eada";
     ctx.globalAlpha = 0.72;
     ctx.fill();
@@ -895,24 +960,45 @@ function App() {
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // -- If holding a flag, draw the flag
+    // -- If holding a flag, draw the flag (bigger, sci-fi, cartoon)
     if (flag && flag.heldBy === "player") {
       ctx.save();
-      ctx.translate(13, 8);
+      // "Attach" to right hand when running (limb swings)
+      const handX = 13 + armSwing * 0.18;
+      const handY = 8 + armSwing * 0.20;
+      ctx.translate(handX, handY);
+      // Staff
+      ctx.save();
+      ctx.lineWidth = 3.1;
+      ctx.strokeStyle = "#23264d";
+      ctx.beginPath();
+      ctx.moveTo(-FLAG_SIZE*0.34, -FLAG_SIZE/2+6);
+      ctx.lineTo(-FLAG_SIZE*0.34, FLAG_SIZE*0.4);
+      ctx.stroke();
+      ctx.restore();
+      // Main flag
       ctx.beginPath();
       ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
       ctx.fillStyle = CLR_ACC;
       ctx.shadowColor = "#ffd44d";
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 12;
       ctx.fill();
       ctx.shadowBlur = 0;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.1;
       ctx.strokeStyle = "#ffe576";
       ctx.stroke();
-      ctx.font = "bold 15px Arial";
+      ctx.font = "bold 21px Arial";
       ctx.fillStyle = "#303865";
       ctx.globalAlpha = 0.98;
-      ctx.fillText("🏳️", 0, 4);
+      ctx.fillText("🏳️", 0, 7);
+      // Little sparkle accent
+      ctx.globalAlpha = 0.60;
+      ctx.beginPath();
+      ctx.moveTo(8, 3);
+      ctx.lineTo(18, 10.5);
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = "#ffe799";
+      ctx.stroke();
       ctx.globalAlpha = 1;
       ctx.restore();
     }
