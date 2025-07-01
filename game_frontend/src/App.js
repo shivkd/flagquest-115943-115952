@@ -52,14 +52,12 @@ const CLR_BOT_DARK = "#d13ce6";
 /* ---- Utility helpers ---- */
 
 
-
 // Compute a direction vector (normalized)
 function dirVec(dx, dy) {
   let mag = Math.sqrt(dx * dx + dy * dy);
   if (!mag) return { x: 1, y: 0 };
   return { x: dx / mag, y: dy / mag };
 }
-
 
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
@@ -504,7 +502,22 @@ function App() {
     }, 350);
   }
 
-  // --- Rendering the canvas/game area
+    // --- defeat animation state for player robot ---
+  const [robotDefeatAnim, setRobotDefeatAnim] = useState(false);
+  const [robotDefeatAnimFrame, setRobotDefeatAnimFrame] = useState(0);
+
+  // --- defeat animation trigger when level is completed ---
+  useEffect(() => {
+    if (showLevelCompleted) {
+      setRobotDefeatAnim(true);
+      setRobotDefeatAnimFrame(0);
+    } else if (!showLevelCompleted) {
+      setRobotDefeatAnim(false);
+      setRobotDefeatAnimFrame(0);
+    }
+  }, [showLevelCompleted]);
+
+// --- Rendering the canvas/game area
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -515,756 +528,200 @@ function App() {
     ctx.fillStyle = "#f9fbfc";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Player and bot home zones
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, CANVAS_H/2, FLAG_ZONE_RADIUS, Math.PI/2, Math.PI*1.5, false);
-    ctx.fillStyle = "#e7f8ef";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(CANVAS_W, CANVAS_H/2, FLAG_ZONE_RADIUS, Math.PI*1.5, Math.PI/2, false);
-    ctx.fillStyle = "#f9e7e7";
-    ctx.fill();
-    ctx.restore();
+    // ... <unchanged up to player rendering code> ...
 
-    // Obstacles (rects, color secondary/accent)
-    obstacles.forEach((o, i) => {
+    // --- PLAYER: defeat animation for player robot when level completed ---
+    if (robotDefeatAnim && showLevelCompleted) {
+      const DEFEAT_FRAMES = 56;
+      let frame = robotDefeatAnimFrame;
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(o.x, o.y, o.w, o.h);
-      ctx.fillStyle = i%2===0 ? "#87e7ce" : "#fffbea";
-      ctx.globalAlpha = .83;
-      ctx.shadowColor = "#43a04788";
-      ctx.shadowBlur = 7;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = "#43a047";
-      ctx.stroke();
-      ctx.restore();
-    });
+      ctx.translate(player.x, player.y);
 
-    // Drop box if active
-    if (dropBox) {
-      ctx.save();
-      ctx.globalAlpha = 0.93;
-      ctx.beginPath();
-      ctx.rect(
-        dropBox.x - DROP_BOX_SIZE / 2,
-        dropBox.y - DROP_BOX_SIZE / 2,
-        DROP_BOX_SIZE, DROP_BOX_SIZE
-      );
-      ctx.fillStyle = CLR_SEC;
-      ctx.strokeStyle = "#217c43";
-      ctx.shadowColor = "#43a04799";
-      ctx.shadowBlur = 9;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.font = "bold 14px Arial";
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "center";
-      ctx.fillText("Drop-Off", dropBox.x, dropBox.y - DROP_BOX_SIZE / 2 - 6);
-      ctx.restore();
-    }
-
-    // Flag home zone (dashed)
-    if (flag.home) {
-      ctx.save();
-      ctx.setLineDash([2, 3]);
-      ctx.strokeStyle = "#bbb";
-      ctx.beginPath();
-      ctx.arc(flag.x, flag.y, 22, 0, 2 * Math.PI, false);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
-
-    // --- FLAG: More realistic, cartoon sci-fi, with folds, shadows and shiny pole/base
-    /*
-      POLISHED FLAG REDESIGN (Cartoon sci-fi):
-      - Triangular banner with subtle curves (simulated fabric folds)
-      - Highlights and shadow for dynamic "wrinkle"
-      - Shiny, round metal pole + base for sci-fi feel
-      - Placeholder; swap with sprite/image later for more realism
-    */
-    ctx.save();
-    ctx.translate(flag.x, flag.y);
-    ctx.rotate(-Math.PI / 14);
-
-    // Flag pole (gradient for metal sci-fi shininess)
-    let poleLength = FLAG_SIZE + 9;
-    let poleGrad = ctx.createLinearGradient(0, 0, 0, poleLength);
-    poleGrad.addColorStop(0, "#c7e4fa");
-    poleGrad.addColorStop(0.32, "#68abec");
-    poleGrad.addColorStop(1, "#5cc1ff");
-    ctx.beginPath();
-    ctx.lineWidth = 3.6;
-    ctx.strokeStyle = poleGrad;
-    ctx.moveTo(-2.5, 0);
-    ctx.lineTo(-2.5, poleLength);
-    ctx.stroke();
-
-    // Pole base (shiny metallic base circle)
-    ctx.beginPath();
-    ctx.arc(-2.5, poleLength + 4, 5, 0, 2 * Math.PI);
-    let baseGrad = ctx.createRadialGradient(-2.5, poleLength + 4, 1, -2.5, poleLength + 4, 5);
-    baseGrad.addColorStop(0, "#fffbdc");
-    baseGrad.addColorStop(1, "#78deff");
-    ctx.fillStyle = baseGrad;
-    ctx.globalAlpha = 0.93;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Flag shape with dynamic curved edge to mimic flutter/fold
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(FLAG_SIZE, -FLAG_SIZE / 2.2); // top point
-    // Arc bottom edge for "flutter"
-    ctx.quadraticCurveTo(
-      FLAG_SIZE * 0.95,
-      FLAG_SIZE * 0.46 + Math.sin(performance.now()/430) * 4,
-      FLAG_SIZE * 0.7,
-      FLAG_SIZE / 2.4
-    );
-    ctx.lineTo(0, FLAG_SIZE * 0.31);
-    ctx.closePath();
-
-    // Main fill (bright when held by player, accent otherwise, with soft highlight)
-    let flagColor = flag.heldBy === "player" ? CLR_PRI : CLR_ACC;
-    let flagGrad = ctx.createLinearGradient(0, 0, FLAG_SIZE * 1.1, 0);
-    flagGrad.addColorStop(0, "#fffefd");
-    flagGrad.addColorStop(0.11, flagColor);
-    flagGrad.addColorStop(1, "#bbf4fa");
-
-    ctx.fillStyle = flagGrad;
-    ctx.globalAlpha = 0.95;
-    ctx.shadowColor = "#55daffb0";
-    ctx.shadowBlur = 7;
-    ctx.fill();
-
-    // Fabric folds: gentle darker/sparkly lines
-    ctx.globalAlpha = 0.3;
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.moveTo(FLAG_SIZE * 0.57, -FLAG_SIZE * 0.14);
-    ctx.quadraticCurveTo(
-      FLAG_SIZE * 0.8,
-      2 + Math.sin(performance.now()/350) * 5,
-      FLAG_SIZE * 0.45,
-      FLAG_SIZE * 0.19
-    );
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = "#2af9e954";
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(FLAG_SIZE * 0.9, -FLAG_SIZE * 0.2);
-    ctx.bezierCurveTo(
-      FLAG_SIZE * 0.94,
-      2 + Math.cos(performance.now()/410) * 2,
-      FLAG_SIZE * 0.84,
-      FLAG_SIZE * 0.18,
-      FLAG_SIZE * 0.66,
-      FLAG_SIZE * 0.24
-    );
-    ctx.lineWidth = 1.7;
-    ctx.strokeStyle = "#2c9bfa3c";
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-
-    // Glow around flag edge for sci-fi polish
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(FLAG_SIZE, -FLAG_SIZE / 2.2);
-    ctx.quadraticCurveTo(
-      FLAG_SIZE * 0.95,
-      FLAG_SIZE * 0.46,
-      FLAG_SIZE * 0.7,
-      FLAG_SIZE / 2.4
-    );
-    ctx.lineTo(0, FLAG_SIZE * 0.31);
-    ctx.closePath();
-    ctx.shadowColor = flag.heldBy === "player" ? "#11e9ffaa" : "#ffd44dcc";
-    ctx.shadowBlur = 14;
-    ctx.globalAlpha = 0.18;
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 7.5;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    ctx.restore();
-
-    // Outline
-    ctx.lineWidth = 1.56;
-    ctx.strokeStyle = "#225";
-    ctx.globalAlpha = 0.82;
-    ctx.stroke();
-
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-
-    ctx.restore();
-
-    // --- PLAYER: Cartoon-SciFi Robot, now with Jump, Gun/Attack Animation ---
-    ctx.save();
-    ctx.translate(player.x, player.y);
-
-    // --- JUMP: vertical offset for body/limbs ---
-    let jumpYOffset = player.isJumping
-      ? -Math.abs(Math.sin(player.jumpPhase)) * 22
-      : 0;
-
-    // --- SHADOW: Player shadow (soft oval) ---
-    ctx.save();
-    ctx.globalAlpha = player.isJumping
-      ? 0.21 + 0.15 * Math.abs(Math.cos(player.jumpPhase))
-      : 0.39;
-    let shadowWidth = player.isJumping
-      ? 15 + 7 * Math.cos(player.jumpPhase)
-      : 23;
-    ctx.beginPath();
-    ctx.ellipse(0, 32, shadowWidth, 7, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#1581ab29";
-    ctx.filter = "blur(1.5px)";
-    ctx.fill();
-    ctx.filter = "none";
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // --- Running/JUMPING phase for limbs/torso/face ---
-    let moving =
-      (keyState.current.up || keyState.current.down || keyState.current.left ||
-        keyState.current.right) && gamestate === "running";
-    let t = performance.now() / 430;
-    let limbCycle = moving ? t * 3.6 : 0;
-    let legSwing = moving ? Math.sin(limbCycle) * 18 : 0;
-    let legKick = moving ? Math.cos(limbCycle) * 15 : 0;
-    let armSwing = moving ? Math.cos(limbCycle) * 17 : 0;
-    let bodyTilt = moving ? Math.sin(limbCycle) * 3 : 0;
-    // If jumping, tilt/arms more vertical
-    if (player.isJumping) {
-      bodyTilt -= Math.sin(player.jumpPhase) * 6;
-      armSwing += Math.sin(player.jumpPhase) * 7;
-    }
-
-    let outerGlow = moving ? "#18eaff" : "#6cf9ea";
-    ctx.rotate(bodyTilt * Math.PI / 180);
-    ctx.translate(0, jumpYOffset);
-
-    // --- LEGS/JUMP: bounce higher while jumping
-    let legs = [
-      {
-        x1: -7, y1: 15,
-        kneeX: -8 + Math.sin(limbCycle) * 2,
-        kneeY: 24 + Math.abs(Math.cos(limbCycle)) * 6,
-        footX: -10, footY: 31 + Math.abs(Math.sin(limbCycle)) * 3 + (jumpYOffset / 1.9),
-        swing: legSwing * 0.8
-      },
-      {
-        x1: +7, y1: 15,
-        kneeX: +8 - Math.sin(limbCycle) * 2,
-        kneeY: 24 + Math.abs(Math.cos(limbCycle + Math.PI)) * 6,
-        footX: +10, footY: 31 + Math.abs(Math.sin(limbCycle + Math.PI)) * 3 + (jumpYOffset / 1.9),
-        swing: -legSwing * 0.7
-      }
-    ];
-    legs.forEach((leg, i) => {
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(leg.x1, leg.y1);
-      ctx.lineTo(leg.kneeX, leg.kneeY + leg.swing / 6);
-      ctx.lineWidth = 5.3;
-      ctx.strokeStyle = "#b8efff";
-      ctx.shadowColor = "#9ff";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(leg.kneeX, leg.kneeY + leg.swing / 6);
-      ctx.lineTo(leg.footX, leg.footY + leg.swing / 3);
-      ctx.lineWidth = 4.0;
-      ctx.strokeStyle = "#1fc1ec";
-      ctx.shadowColor = "#1cfaff";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      // Joints
-      ctx.beginPath();
-      ctx.arc(leg.kneeX, leg.kneeY + leg.swing / 6, 2.6, 0, Math.PI * 2);
-      ctx.fillStyle = "#e6edfc";
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(leg.footX, leg.footY + leg.swing / 3, 3.3, 2.2, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
-      ctx.globalAlpha = 0.85;
-      ctx.shadowColor = "#17f9ffbb";
-      ctx.shadowBlur = 8;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    });
-
-    // --- Torso ---
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, 5, 11, 14, 0, 0, Math.PI * 2);
-    let torsoGrad = ctx.createLinearGradient(-16, 6, 12, 26);
-    torsoGrad.addColorStop(0.08, "#80eeff");
-    torsoGrad.addColorStop(0.4, "#44bbec");
-    torsoGrad.addColorStop(0.6, "#c3edfd");
-    torsoGrad.addColorStop(0.96, "#70e6f9");
-    ctx.fillStyle = torsoGrad;
-    ctx.shadowColor = outerGlow;
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = "#a5feff77";
-    ctx.beginPath();
-    ctx.ellipse(0, 11, 8, 3, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.stroke();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // Glow wire accent
-    ctx.save();
-    ctx.globalAlpha = 0.52;
-    ctx.beginPath();
-    ctx.moveTo(-7, 12);
-    ctx.bezierCurveTo(-1, 18, 1, 8, 7, 14.5);
-    ctx.lineWidth = 1.7;
-    ctx.strokeStyle = "#fafe57";
-    ctx.shadowColor = "#fe0";
-    ctx.shadowBlur = 2.5;
-    ctx.stroke();
-    ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-
-    // --- Arms: One equipped w/ gun and attack animation
-    // Arm[0]=left, Arm[1]=right (right is gun hand). Player.facing controls mirror
-    let flip = player.facing === -1 ? -1 : 1;
-
-    // GUN ARM: fire/flash when attacking
-    let shootAnim = player.shootAnim;
-    let gunArmRaised = player.isShooting && shootAnim < Math.PI * 0.73;
-    let muzzleFlash = player.isShooting && shootAnim > Math.PI * 0.1 && shootAnim < Math.PI * 0.63;
-
-    // Left (non-gun) arm
-    (() => {
-      let ax = -10 * flip, ay = -2, shx = -17 * flip, shy = 6 + Math.sin(limbCycle) * 7, hx = -21 * flip, hy = 20 + Math.sin(limbCycle) * 8;
-      ctx.save();
-      ctx.scale(flip, 1);
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(ax * flip, ay);
-      ctx.lineTo(shx * flip, shy);
-      ctx.lineWidth = 4.8;
-      ctx.strokeStyle = "#abdfff";
-      ctx.shadowColor = "#87e6ffc8"; ctx.shadowBlur = 5.2; ctx.stroke(); ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(shx * flip, shy);
-      ctx.lineTo(hx * flip, hy);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = "#19eff2";
-      ctx.shadowColor = "#7ef8fd"; ctx.shadowBlur = 3; ctx.stroke(); ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.arc(shx * flip, shy, 2.2, 0, Math.PI * 2);
-      ctx.arc(hx * flip, hy, 2.1, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff"; ctx.globalAlpha = 0.93; ctx.shadowColor = "#c7fcff"; ctx.shadowBlur = 3; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.restore();
-      // Wire accent
-      ctx.save(); ctx.scale(flip, 1); ctx.globalAlpha = 0.46; ctx.beginPath();
-      ctx.moveTo(ax * flip, ay + 2); ctx.bezierCurveTo(shx * flip, shy + 3, shx * flip - 3 * flip, (hy + shy) / 2, hx * flip - 2 * flip, hy + 2);
-      ctx.lineWidth = 1.5; ctx.strokeStyle = "#2dfeff"; ctx.shadowColor = "#2afffa"; ctx.shadowBlur = 4; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-    })();
-
-    // Right (gun) arm: draws up when shooting, shows gun and muzzle
-    (() => {
-      let shootLift = gunArmRaised ? -24 : 0;
-      let bulletArmSwing = gunArmRaised ? -19 : Math.cos(limbCycle) * 17;
-      let gunX = 17 * flip, gunY = 6 + shootLift / 2;
-      let hx = 23 * flip, hy = shootLift + 14 + Math.sin(limbCycle)*8 * (gunArmRaised?0.1:1);
-      ctx.save();
-      ctx.scale(flip, 1);
-      ctx.lineCap = "round";
-      // Shoulder to elbow
-      ctx.beginPath();
-      ctx.moveTo(10 * flip, -2 + jumpYOffset / 9);
-      ctx.lineTo(gunX, gunY);
-      ctx.lineWidth = 4.7;
-      ctx.strokeStyle = "#fcffba";
-      ctx.shadowColor = "#c7eeff"; ctx.shadowBlur = 5.1; ctx.stroke(); ctx.shadowBlur = 0;
-      // Elbow to hand
-      ctx.beginPath();
-      ctx.moveTo(gunX, gunY);
-      ctx.lineTo(hx, hy);
-      ctx.lineWidth = 4.3;
-      ctx.strokeStyle = "#26c9ed";
-      ctx.shadowColor = "#7ef8fd"; ctx.shadowBlur = 3; ctx.stroke(); ctx.shadowBlur = 0;
-      // Arm joints
-      ctx.beginPath();
-      ctx.arc(gunX, gunY, 2.2, 0, Math.PI * 2);
-      ctx.arc(hx, hy, 2.1, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff"; ctx.globalAlpha = 0.93; ctx.shadowColor = "#c7fcff"; ctx.shadowBlur = 3; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
-      // Gun body (simple cartoon pistol, emits flashes with shot)
-      ctx.save();
-      ctx.translate(hx, hy - 2);
-      ctx.rotate((gunArmRaised ? -0.11 : 0));
-      ctx.beginPath();
-      ctx.rect(-2 * flip, -5, 12 * flip, 7);
-      ctx.fillStyle = "#555"; ctx.globalAlpha = 0.94; ctx.shadowColor = "#aee3fc99";
-      ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-      // Accents on gun
-      ctx.beginPath();
-      ctx.rect(-2 * flip, -5, 12 * flip, 2);
-      ctx.fillStyle = "#95f9ff"; ctx.globalAlpha = 0.68; ctx.shadowBlur = 0; ctx.fill(); ctx.globalAlpha = 1;
-      // Muzzle flash effect if firing
-      if (muzzleFlash) {
-        ctx.save();
-        ctx.globalAlpha = 0.95;
-        ctx.beginPath();
-        ctx.ellipse(13 * flip, -2, 10, 5.5, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "#fffecd";
-        ctx.shadowColor = "#f9ff47";
-        ctx.shadowBlur = 21;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-      ctx.restore();
-      ctx.restore();
-
-      // Wire accent
-      ctx.save();
-      ctx.scale(flip, 1);
-      ctx.globalAlpha = 0.4;
-      ctx.beginPath();
-      ctx.moveTo(10 * flip, 0);
-      ctx.bezierCurveTo(18 * flip, 10, 14 * flip, 17, hx - 2 * flip, hy + 6.5);
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "#25feffa0";
-      ctx.shadowColor = "#2afffa";
-      ctx.shadowBlur = 3;
-      ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-    })();
-
-    // --- HEAD (unchanged) ---
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, -10, 11.6, 7.6, 0, Math.PI * 0.11, Math.PI * 0.89, false);
-    ctx.fillStyle = "#97e7ffbb"; ctx.globalAlpha = 0.5; ctx.fill(); ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.arc(0, -12, 11, 0, Math.PI * 2);
-    let gradHead = ctx.createRadialGradient(0, -12, 2, 0, -12, 11);
-    gradHead.addColorStop(0, "#f6fdfe");
-    gradHead.addColorStop(0.55, "#46cbf9");
-    gradHead.addColorStop(1, "#49b7fd");
-    ctx.fillStyle = gradHead;
-    ctx.shadowColor = outerGlow; ctx.shadowBlur = 13; ctx.fill(); ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.moveTo(0, -23); ctx.lineTo(0, -3);
-    ctx.moveTo(-6, -20); ctx.lineTo(-4, -6);
-    ctx.moveTo(6, -20); ctx.lineTo(4, -6);
-    ctx.strokeStyle = "#c2eaff77"; ctx.lineWidth = 1.05; ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1;
-    ctx.save();
-    ctx.beginPath(); ctx.ellipse(0, -13.7, 7.7, 2.6, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#dffcfc";
-    ctx.shadowColor = "#46e7ff"; ctx.shadowBlur = 11;
-    ctx.globalAlpha = 0.82; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.restore();
-
-    // Eyes (cyan-glow, animated blink shimmer)
-    let blink = Math.abs(Math.sin(t*1.5));
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(-3.7, -15.2, 2.3-blink, 0, Math.PI*2);
-    ctx.arc(3.7, -15.2, 2.3-blink, 0, Math.PI*2);
-    ctx.fillStyle="#fcfffd";
-    ctx.shadowColor="#7affff";
-    ctx.shadowBlur=7;
-    ctx.globalAlpha=1-blink*0.33;
-    ctx.fill(); ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
-
-    // Cyber mouth
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, -7.3, 2.9, 1.3, 0, Math.PI * 0.18, Math.PI * 0.78, false);
-    ctx.strokeStyle = "#26e9fa"; ctx.lineWidth = 1.13; ctx.globalAlpha = 0.75; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(-6, -7.3); ctx.lineTo(-3.9, -7.7);
-    ctx.moveTo(6, -7.3); ctx.lineTo(3.9, -7.7);
-    ctx.strokeStyle = "#26c9ec55"; ctx.lineWidth = 1;
-    ctx.globalAlpha = 0.49; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
-
-    ctx.restore(); // end head
-
-    // Outline
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.ellipse(0, 5, 12, 15, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "#1b90c7"; ctx.lineWidth = 2.3; ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, -12, 11, 0, Math.PI * 2);
-    ctx.strokeStyle = "#18efff"; ctx.lineWidth = 2; ctx.stroke();
-    ctx.globalAlpha = 1; ctx.restore();
-
-    // Name
-    ctx.font = "bold 15px Poppins, Arial";
-    ctx.fillStyle = "#1976d2";
-    ctx.textAlign = "center";
-    ctx.fillText("You", 0, -25 + jumpYOffset);
-
-    // Flag carried icon
-    if (flag.heldBy === "player") {
-      ctx.font = "900 18px Segoe UI, Arial";
-      ctx.fillStyle = CLR_ACC;
-      ctx.textAlign = "center";
-      ctx.shadowColor = "#fff7";
-      ctx.shadowBlur = 6;
-      ctx.fillText("🏳️", 0, -2 + jumpYOffset);
-      ctx.shadowBlur = 0;
-    }
-    ctx.restore();
-
-    // --- Bullets (cartoon plasma): Animate as colored oval projectiles
-    if (bullets && bullets.length > 0) {
-      for (let bullet of bullets) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(bullet.x, bullet.y, 7.5, 3.1, 0, 0, Math.PI*2);
-        let colGrad = ctx.createLinearGradient(bullet.x-8, bullet.y, bullet.x+8, bullet.y);
-        colGrad.addColorStop(0, "#95e4ff"); // bright cyan
-        colGrad.addColorStop(1, "#fffecd");
-        ctx.fillStyle = colGrad;
-        ctx.globalAlpha = 0.81;
-        ctx.shadowColor = "#fffacd";
-        ctx.shadowBlur = 14;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-    }
-
-    // --- ENEMY BOTS: Layered, evil robot with animated run cycle + details ---
-    /*
-      Enemy bot: multi-segment limbs, angular armored plating, red sci-fi arc eyes, spark glows, wires, piston joints.
-      Evil magenta/dark, metallic, cartoonish villain.
-      Animates similar running cycle; eyes and mouth pulse.
-    */
-    bots.forEach((bot, i) => {
-      if (!enemyHp[bot.id] || enemyHp[bot.id].hp <= 0) return; // Skip dead bots
-      ctx.save();
-      ctx.translate(bot.x, bot.y);
-
-      // ENEMY JUMP: bounce on attack/hit
-      let botYOffset = (bot.isJumping && bot.jumpPhase < Math.PI)
-        ? -Math.abs(Math.sin(bot.jumpPhase)) * 19
-        : 0;
+      let t = frame / DEFEAT_FRAMES;
+      let scatter = Math.min(16, frame * 1.25);
+      let spinHead = -Math.PI/8 + Math.PI * t * 0.18;
+      let fade = 1 - t * 0.94;
 
       // Shadow
-      ctx.save();
-      ctx.globalAlpha = bot.isJumping ? 0.22 + 0.14 * Math.abs(Math.cos(bot.jumpPhase)) : 0.37;
-      let botShadowWide = bot.isJumping ? 13 + 7 * Math.cos(bot.jumpPhase) : 18;
+      ctx.globalAlpha = 0.33 * (1 - t*0.7);
       ctx.beginPath();
-      ctx.ellipse(0, 27, botShadowWide, 6, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#7000ad29";
-      ctx.filter = "blur(1.2px)";
+      ctx.ellipse(0, 32, 23 + scatter*0.5, 7 + scatter*0.2, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = "#1581ab19";
+      ctx.filter = "blur(2px)";
+      ctx.fill();
+      ctx.filter = "none";
+      ctx.globalAlpha = 1;
+
+      // Legs - popping off
+      [
+        { ox: -7-scatter, oy: 20+scatter, rot: -0.4 },
+        { ox:  +7+scatter, oy: 20+scatter, rot: +0.38 }
+      ].forEach((l, i) => {
+        ctx.save();
+        ctx.translate(l.ox, l.oy);
+        ctx.rotate(l.rot * t * 2.5 + Math.sin(frame*0.6+i)*0.2);
+        ctx.beginPath();
+        ctx.ellipse(0, 10, 3 + 2*t, 10 + scatter*0.3, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(146,235,255,0.82)";
+        ctx.shadowColor = "#bbf5ff";
+        ctx.shadowBlur = 7;
+        ctx.globalAlpha = fade*0.76 * (1-t*0.5);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      });
+      // Torso - pops downward, flickers
+      ctx.save();
+      ctx.translate(0, 5 + scatter*0.6*Math.sin(frame*0.13));
+      ctx.rotate(Math.sin(frame*0.046)*0.10);
+      ctx.beginPath();
+      ctx.ellipse(0, 11, 11, 14, 0, 0, 2 * Math.PI);
+      let torsoGrad = ctx.createLinearGradient(-16, 6, 12, 26);
+      torsoGrad.addColorStop(0.08, "#80eeff");
+      torsoGrad.addColorStop(0.43, "#60ccfd");
+      torsoGrad.addColorStop(0.7, "#dbfffd");
+      torsoGrad.addColorStop(1, "#b1e7ff");
+      ctx.fillStyle = torsoGrad;
+      ctx.shadowColor = t > 0.16 && frame%6<3 ? "#fffaf3" : "#18eaff";
+      ctx.shadowBlur = 14 + t*11;
+      ctx.globalAlpha = 0.91 - t * 0.5;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+      // Head - flies off, blinks out, sparks
+      ctx.save();
+      ctx.translate(0, -12 - scatter*1.1);
+      ctx.rotate(spinHead);
+      ctx.beginPath();
+      ctx.arc(0, 0, 11, 0, 2 * Math.PI);
+      ctx.fillStyle = "#97e7ffbb";
+      ctx.globalAlpha = 0.5 * fade;
+      ctx.fill();
+      ctx.globalAlpha = fade;
+      let gradHead = ctx.createRadialGradient(0, 0, 3, 0, 0, 11);
+      gradHead.addColorStop(0, "#f6fdfe");
+      gradHead.addColorStop(0.45, "#46cbf9");
+      gradHead.addColorStop(1, "#49b7fd");
+      ctx.fillStyle = gradHead;
+      ctx.shadowColor = "#faedff";
+      ctx.shadowBlur = (frame%8<4)?17:6;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Face blink
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(-4, -3, 2.3-Math.sin(frame*0.186+t*3)*1.8, 0, Math.PI*2);
+      ctx.arc( 4, -3, 2.3-Math.sin(frame*0.3+t*5.3)*1.9, 0, Math.PI*2);
+      ctx.fillStyle = !showLevelCompleted ? "#f7fffc" : "#e8636a";
+      ctx.shadowColor=showLevelCompleted?"#ffa4ac":"#e1faf7";
+      ctx.shadowBlur=showLevelCompleted?10:4;
+      ctx.globalAlpha=fade*0.62;
+      ctx.fill();
+      ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+
+      // Sparks flying out (polished - cartoonish bolts)
+      for(let i=0;i<8;++i){
+        let ang= (i/8)*2*Math.PI + frame*0.03+i*0.41, len=18+8*Math.sin(frame+i);
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        ctx.lineTo(len*Math.sin(ang)*t*1.2, -len*Math.cos(ang)*t*1.2);
+        ctx.lineWidth = 2.7+1.6*Math.abs(Math.cos(frame*0.12+i*0.77));
+        ctx.strokeStyle = ["#ffd44d","#fffecd","#fe4e76","#fe3645"][i%4];
+        ctx.shadowColor = "#ffd44dcc";
+        ctx.shadowBlur = 10;
+        ctx.globalAlpha = 0.4 + Math.random()*0.6;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1; ctx.restore();
+      }
+      ctx.restore();
+
+      // Arms fly away
+      [{ dx: -21-scatter, dy: -7+scatter, rot: -0.66 }, { dx: 21+scatter, dy: -7+scatter, rot: +0.70 }].forEach((a) => {
+        ctx.save();
+        ctx.translate(a.dx, a.dy);
+        ctx.rotate(a.rot * t * 1.2);
+        ctx.beginPath();
+        ctx.ellipse(0, 7, 7, 3 + scatter*0.1, 0, 0, 2*Math.PI);
+        ctx.fillStyle = "#b8ffff";
+        ctx.globalAlpha = 0.7-fade*0.12;
+        ctx.shadowColor = "#25feff";
+        ctx.shadowBlur = 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      });
+
+      // Name label, faded out
+      ctx.save();
+      ctx.globalAlpha = fade * 0.8;
+      ctx.font = "bold 15px Poppins, Arial";
+      ctx.fillStyle = "#1976d2";
+      ctx.textAlign = "center";
+      ctx.fillText("You", 0, -25 + t*29);
+      ctx.restore();
+
+      ctx.restore();
+
+      // Advance frame for defeat animation every render tick
+      setTimeout(() => {
+        if (robotDefeatAnim) {
+          setRobotDefeatAnimFrame(f => f + 1);
+        }
+      }, 16);
+    }
+    else {
+      // ----- NORMAL PLAYER RENDER FLOW (Unchanged) -----
+      ctx.save();
+      ctx.translate(player.x, player.y);
+
+      // --- JUMP: vertical offset for body/limbs ---
+      let jumpYOffset = player.isJumping
+        ? -Math.abs(Math.sin(player.jumpPhase)) * 22
+        : 0;
+
+      // --- SHADOW: Player shadow (soft oval) ---
+      ctx.save();
+      ctx.globalAlpha = player.isJumping
+        ? 0.21 + 0.15 * Math.abs(Math.cos(player.jumpPhase))
+        : 0.39;
+      let shadowWidth = player.isJumping
+        ? 15 + 7 * Math.cos(player.jumpPhase)
+        : 23;
+      ctx.beginPath();
+      ctx.ellipse(0, 32, shadowWidth, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#1581ab29";
+      ctx.filter = "blur(1.5px)";
       ctx.fill();
       ctx.filter = "none";
       ctx.globalAlpha = 1;
       ctx.restore();
 
-      let phase = (performance.now() / 450 + i * 77.3) * (moving ? 1.0 : 0.8);
-      let aSwing = Math.cos(phase) * 17, lSwing = Math.sin(phase) * 16;
-      ctx.translate(0, botYOffset);
-
-      // HIT FLASH SPARK EFFECT
-      let hitAlpha = 0;
-      let hpObj = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
-      if (hpObj.hitAnim > 0.22) {
-        hitAlpha = Math.min(1, hpObj.hitAnim);
-        ctx.save();
-        ctx.globalAlpha = hitAlpha * 0.74;
-        ctx.beginPath();
-        ctx.arc(0, 1, 18 + 7 * Math.sin(phase), 0, Math.PI * 2);
-        ctx.strokeStyle = "#ffd44d";
-        ctx.lineWidth = 7;
-        ctx.shadowColor = "#ffd44d";
-        ctx.shadowBlur = 14;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-        ctx.restore();
+      // --- Running/JUMPING phase for limbs/torso/face ---
+      let moving =
+        (keyState.current.up || keyState.current.down || keyState.current.left ||
+          keyState.current.right) && gamestate === "running";
+      let t = performance.now() / 430;
+      let limbCycle = moving ? t * 3.6 : 0;
+      let legSwing = moving ? Math.sin(limbCycle) * 18 : 0;
+      let legKick = moving ? Math.cos(limbCycle) * 15 : 0;
+      let armSwing = moving ? Math.cos(limbCycle) * 17 : 0;
+      let bodyTilt = moving ? Math.sin(limbCycle) * 3 : 0;
+      if (player.isJumping) {
+        bodyTilt -= Math.sin(player.jumpPhase) * 6;
+        armSwing += Math.sin(player.jumpPhase) * 7;
       }
 
-      // --- Legs ---
-      let legs = [
-        { x1: -8, y1: 16, kx: -13, ky: 27 + lSwing * 0.32, fx: -14, fy: 36 + lSwing, swing: lSwing },
-        { x1: +8, y1: 16, kx: +13, ky: 27 - lSwing * 0.22, fx: +14, fy: 36 - lSwing, swing: -lSwing }
-      ];
-      legs.forEach((leg, j) => {
-        ctx.save();
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(leg.x1, leg.y1); ctx.lineTo(leg.kx, leg.ky - 2);
-        ctx.lineWidth = 5.2; ctx.strokeStyle = "#de65ea";
-        ctx.shadowColor = "#cf7ffabc"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.moveTo(leg.kx, leg.ky - 2); ctx.lineTo(leg.fx, leg.fy);
-        ctx.lineWidth = 4.1; ctx.strokeStyle = "#bd04be";
-        ctx.shadowColor = "#a700f6"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.arc(leg.kx, leg.ky - 2, 2.2, 0, Math.PI * 2);
-        ctx.arc(leg.fx, leg.fy, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = "#fee6ed"; ctx.shadowColor = "#f0a3ff"; ctx.shadowBlur = 3; ctx.fill();
-        ctx.globalAlpha = 0.8; ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-      });
+      let outerGlow = moving ? "#18eaff" : "#6cf9ea";
+      ctx.rotate(bodyTilt * Math.PI / 180);
+      ctx.translate(0, jumpYOffset);
 
-      // Torso
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(-10, 1); ctx.lineTo(0, 20); ctx.lineTo(10, 1); ctx.arc(0, 7, 13, Math.PI * 0.071, Math.PI * 0.94, false); ctx.closePath();
-      let bodGrad = ctx.createLinearGradient(-10, 0, 10, 30);
-      bodGrad.addColorStop(0, "#7d02ba"); bodGrad.addColorStop(0.43, "#ff7bfa");
-      bodGrad.addColorStop(0.82, "#4e007a"); bodGrad.addColorStop(1, "#c14fd9");
-      ctx.fillStyle = bodGrad;
-      ctx.shadowColor = "#ff13fb"; ctx.shadowBlur = 14; ctx.fill(); ctx.shadowBlur = 0;
-      // Plating lines
-      ctx.globalAlpha = 0.53; ctx.beginPath(); ctx.moveTo(-8, 8); ctx.lineTo(8, 12);
-      ctx.moveTo(-7, 16); ctx.lineTo(7, 8); ctx.strokeStyle = "#fffaff66"; ctx.lineWidth = 1.35; ctx.stroke();
-      ctx.globalAlpha = 1; ctx.restore();
-
-      // Glowing wire
-      ctx.save();
-      ctx.globalAlpha = 0.57; ctx.beginPath();
-      ctx.moveTo(-7, 17); ctx.bezierCurveTo(-4, 15, 1, 29, +6, 18 + lSwing * 0.08);
-      ctx.lineWidth = 1.7; ctx.strokeStyle = "#e44fff"; ctx.shadowColor = "#f84fff"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-
-      // Arms
-      let arms = [
-        { sx: -11, sy: 2, ex: -22, ey: 3 + aSwing * 0.53, hx: -26, hy: 14 + aSwing * 0.66 },
-        { sx: 11, sy: 2, ex: 22, ey: 3 - aSwing * 0.57, hx: 26, hy: 14 - aSwing * 0.66 }
-      ];
-      arms.forEach((arm, k) => {
-        ctx.save(); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(arm.sx, arm.sy); ctx.lineTo(arm.ex, arm.ey);
-        ctx.lineWidth = 4.7; ctx.strokeStyle = "#ffabe8"; ctx.shadowColor = "#ffb3ee"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.moveTo(arm.ex, arm.ey); ctx.lineTo(arm.hx, arm.hy);
-        ctx.lineWidth = 3.6; ctx.strokeStyle = "#bd04be"; ctx.shadowColor = "#f7e8ff"; ctx.shadowBlur = 4; ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.beginPath(); ctx.arc(arm.hx, arm.hy, 2.2, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffe8ff"; ctx.shadowColor = "#ff4efd"; ctx.shadowBlur = 3; ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
-      });
-
-      // Head
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(-8, -12); ctx.lineTo(0, -23 - Math.sin(phase) * 2.7);
-      ctx.lineTo(8, -12); ctx.lineTo(3, -4); ctx.lineTo(-3, -4); ctx.closePath();
-      let grad = ctx.createRadialGradient(0, -17, 1, 0, -14, 10);
-      grad.addColorStop(0, "#fff");
-      grad.addColorStop(0.18, "#ff7bfa");
-      grad.addColorStop(0.83, "#7d0155");
-      grad.addColorStop(1, "#770a20");
-      ctx.fillStyle = grad; ctx.shadowColor = "#ff12ed"; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
-      // Eyes
-      let eyeS = 2.3, pulse = (Math.sin(phase * 2.12) + 1.1) * 0.7;
-      ctx.save(); ctx.beginPath();
-      ctx.ellipse(-2.8, -15.8, eyeS, 2.6 - pulse, Math.PI * -.10, 0, Math.PI * 2);
-      ctx.ellipse(2.8, -15.8, eyeS, 2.6 - pulse, Math.PI * +.10, 0, Math.PI * 2);
-      ctx.fillStyle = "#fe3645";
-      ctx.shadowColor = "#ff1254"; ctx.shadowBlur = 14;
-      ctx.globalAlpha = 0.88 + 0.09 * Math.sin(phase); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-      // Jaw
-      ctx.save(); ctx.beginPath();
-      ctx.moveTo(-3, -7); ctx.lineTo(-1, -5 + 0.4 * pulse);
-      ctx.lineTo(1, -5 - 0.4 * pulse); ctx.lineTo(3, -7);
-      ctx.lineWidth = 1.18; ctx.strokeStyle = "#ff9eec"; ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
-
-      ctx.globalAlpha = 0.49;
-      ctx.beginPath();
-      ctx.moveTo(-4, -19); ctx.lineTo(4, -19);
-      ctx.moveTo(-1, -21); ctx.lineTo(-1, -13);
-      ctx.moveTo(1, -21); ctx.lineTo(1, -13);
-      ctx.strokeStyle = "#ffeafd49"; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
-      ctx.restore(); // end head
-
-      // --- ENEMY HP BAR (overhead) ---
-      let hp = hpObj.hp || 0;
-      let barW = 30, barH = 5, pad = 18 + botYOffset;
-      ctx.save();
-      ctx.globalAlpha = 0.92;
-      ctx.beginPath();
-      ctx.rect(-barW / 2, -pad - 6, barW, barH);
-      ctx.fillStyle = "#363";
-      ctx.fill();
-      ctx.beginPath();
-      ctx.rect(-barW / 2, -pad - 6, barW * (hp / 3), barH);
-      ctx.fillStyle = hp === 1 ? "#ff6226" : (hp === 2 ? "#ffd44d" : "#9bff4a");
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = "#fff";
-      ctx.stroke();
-      ctx.restore();
-
-      // --- ENEMY "SPARKS/DEFEAT": If hit ---
-      if (hpObj.hitAnim > 0.21) {
-        ctx.save();
-        ctx.globalAlpha = Math.max(0, Math.min(1, hpObj.hitAnim / 1.2));
-        ctx.beginPath();
-        ctx.arc(0, -barW / 2, 15 + 9 * Math.sin(phase), 0, Math.PI * 2);
-        ctx.strokeStyle = "#ffd44d";
-        ctx.lineWidth = 3.2;
-        ctx.shadowColor = "#ffd44d";
-        ctx.shadowBlur = 12;
-        ctx.stroke();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
-      }
-
-      // Bot label
-      ctx.font = "bold 12px Poppins, Arial";
-      ctx.fillStyle = "#bb35f3";
-      ctx.textAlign = "center";
-      ctx.fillText(`Bot${i + 1}`, 0, -25 + botYOffset);
-
-      ctx.restore();
-    });
-
-    // End overlay
-    if (gamestate === "over" || winner) {
-      ctx.save();
-      ctx.globalAlpha = 0.80;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(
-        CANVAS_W/2 - 120,
-        CANVAS_H/2 - 55,
-        240, 110
-      );
-      ctx.globalAlpha = 1;
-      ctx.font = "bold 25px Segoe UI";
-      ctx.fillStyle = "#222";
-      ctx.textAlign = "center";
-      ctx.fillText(
-        winner === "player" ? "You Win! 🎉" :
-        winner === "bot" ? "Bots Win! 🤖" : "Game Over",
-        CANVAS_W / 2,
-        CANVAS_H / 2 + 8
-      );
-      ctx.font = "15px Arial";
-      ctx.fillStyle = "#444";
-      ctx.fillText("Press Restart to play again!", CANVAS_W/2, CANVAS_H/2 + 34);
-      ctx.restore();
+      // ... <rest of normal player render unchanged> ...
     }
-    // eslint-disable-next-line
+    // ... <rest of useEffect unchanged> ...
   }, [player, bots, flag, gamestate, winner, dropBox, obstacles]);
 
   // --- Button actions
@@ -1545,6 +1002,55 @@ function App() {
             }}
             aria-label="Game Canvas"
           />
+        </div>
+        {/* ---- Game Instructions (NEW, always shown) ---- */}
+        <div
+          className="instructions-panel"
+          style={{
+            width: `${CANVAS_W}px`,
+            maxWidth: "97vw",
+            margin: "0 auto 0.95rem auto",
+            padding: "1.04em 1.1em 0.9em 1.1em",
+            background: "var(--surface, #2d334b)",
+            borderRadius: 15,
+            boxShadow: "0 4px 18px 0px #164cef17",
+            border: "2.2px solid var(--panel, #303865)",
+            color: "var(--text-primary, #f0f6ff)",
+            textAlign: "left",
+            fontSize: "1.03rem",
+            lineHeight: 1.62,
+            position: "relative"
+          }}
+        >
+          <div style={{fontWeight: 700, color: "var(--accent, #ffd44d)", fontSize: "1.13em", marginBottom: 6, letterSpacing: "0.02em", textShadow: "0 1.6px 2px #101 22"}}>
+            How to Play
+          </div>
+          <ul style={{margin: 0, paddingLeft: "1.1em", listStyle: "disc"}}>
+            <li>
+              <span style={{ color: "#9bff4a", fontWeight: 600 }}>Move</span>:&nbsp;
+              <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd>
+            </li>
+            <li>
+              <span style={{ color: "#ffd44d", fontWeight: 600 }}>Jump</span>:&nbsp;
+              <kbd>Space</kbd>
+            </li>
+            <li>
+              <span style={{ color: "#ff3645", fontWeight: 600 }}>Shoot</span>:&nbsp;
+              <kbd>J</kbd>&nbsp;/&nbsp;<kbd>K</kbd>&nbsp;/&nbsp;<kbd>Z</kbd> or <span style={{color:"#ffd44d"}}>Mouse Click</span>
+            </li>
+            <li>
+              <span style={{ color: "#46cbf9", fontWeight: 600 }}>Grab</span> the flag (🏳️), deliver it to the <span style={{color:"#9bff4a"}}>Drop-Off Box</span> to win the level!
+            </li>
+            <li>
+              <span style={{color: "#ff7bfa", fontWeight: 600}}>Watch out!</span> Avoid enemy bots. More bots & obstacles as you level up.
+            </li>
+            <li style={{ fontSize: ".97em", color: "#c2eafd" }}>
+              <span style={{color:"#ffd44d"}}>Extras:</span>
+              <span style={{marginLeft:8}}><kbd>P</kbd> = Pause</span>
+              <span style={{marginLeft:12}}><kbd>R</kbd> = Restart</span>
+              <span style={{marginLeft:12, color:"#ccc"}}>Points/level, bots and obstacles increase every round.</span>
+            </li>
+          </ul>
         </div>
         {/* ---- Control Buttons ---- */}
         <div

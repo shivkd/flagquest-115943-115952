@@ -168,3 +168,40 @@ input[type=number] {
   animation: sci-sparkle 2.3s infinite alternate;
 }
 
+/* Defeat "robot disassembly" animation spark overlay (for player defeat on win) */
+.sci-robot-defeat {
+  animation: sci-robot-defeat-spark 0.95s ease-out;
+}
+
+@keyframes sci-robot-defeat-spark {
+  0% { filter: drop-shadow(0 0 2px #ffd44d66); opacity: 0.78;}
+  50% { filter: drop-shadow(0 0 14px #ffd44ddc); opacity: 0.92;}
+  90% { filter: drop-shadow(0 0 7px #ffd44daa); opacity: 0.7;}
+  100% { filter: none; opacity: 0; }
+}
+
+/* Instructions panel to match game arena polish */
+.instructions-panel {
+  background: var(--surface, #2d334b);
+  border-radius: 15px;
+  box-shadow: 0 4px 18px 0px #164cef17;
+  border: 2.2px solid var(--panel, #303865);
+  color: var(--text-primary, #f0f6ff);
+  font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+  text-align: left;
+  font-size: 1.03rem;
+  line-height: 1.63;
+  margin-bottom: 1.1rem;
+  margin-top: -1.2em;
+  padding: 1.09em 1.3em 1.2em 1.3em;
+  z-index: 2;
+}
+.instructions-panel ul {
+  margin: 0;
+  padding-left: 1em;
+}
+.instructions-panel li {
+  color: #e1f0f4;
+  margin-bottom: 0.26em;
+  font-size: 1em;
+}
