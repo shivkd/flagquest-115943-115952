@@ -1253,6 +1253,10 @@ function App() {
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
                       setLevel(lvl => lvl + 1);
+                      // Restore gameplay control ON NEXT LEVEL: set running state, dismiss overlays, allow player input
+                      setGamestate("running");
+                      setRunning(true);
+                      setShowXToPlay(false); // skip X overlay for smooth progression
                     }}
                   >
                     Continue
@@ -1453,21 +1457,7 @@ function App() {
           }}
         >
           {/* Overlay logic */}
-          {showLevelCompleted && !showLevelFailed && (
-            <button
-              className="game-btn"
-              tabIndex={0}
-              autoFocus
-              aria-label="Advance to Next Level"
-              onClick={() => {
-                setShowLevelCompleted(false);
-                setShowLevelFailed(false);
-                setLevel(lvl => lvl + 1);
-              }}
-            >
-              Advance
-            </button>
-          )}
+          {/* Advance button removed: logic now handled in overlay for correct state restoration */}
           {showLevelFailed && !showLevelCompleted && (
             <button
               className="game-btn"
