@@ -184,10 +184,7 @@ function App() {
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
       if (e.key === "p" || e.key === "P") { if(running) handlePause(); }
-      // Add: allow R to restart at current level, overlays are dismissed
-      if (e.key === "r" || e.key === "R") { 
-        handleRestart(true, { restartAtCurrentLevel: true });
-      }
+      // Removed: 'R' key handling for restart/continue by keyboard, now handled by buttons for level overlays
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -674,10 +671,56 @@ function App() {
             }}
           >
             {levelOverlayMsg}
-            <div style={{ fontWeight: 500, color: "#444", fontSize: 16, marginTop: 8 }}>
+            <div style={{ fontWeight: 500, color: "#444", fontSize: 16, marginTop: 12 }}>
               {showLevelCompleted
-                ? "Press 'R' to retry or advance."
-                : "Press 'R' to try this level again."}
+                ? <span>Level complete! Advance or restart this level.</span>
+                : <span>Try this level again.</span>}
+            </div>
+            <div style={{ marginTop: 24, display: "flex", justifyContent: "center", gap: "1rem", pointerEvents: "auto" }}>
+              {showLevelCompleted && (
+                <>
+                  <button
+                    className="game-btn"
+                    autoFocus
+                    tabIndex={0}
+                    onClick={() => {
+                      // Advance to next level
+                      setShowLevelCompleted(false);
+                      setShowLevelFailed(false);
+                      setLevel(lvl => lvl + 1);
+                    }}
+                  >
+                    Continue
+                  </button>
+                  <button
+                    className="game-btn"
+                    tabIndex={0}
+                    onClick={() => {
+                      // Restart at current level
+                      handleRestart(false, { restartAtCurrentLevel: true });
+                      setShowLevelCompleted(false);
+                      setShowLevelFailed(false);
+                    }}
+                  >
+                    Restart
+                  </button>
+                </>
+              )}
+              {showLevelFailed && (
+                <button
+                  className="game-btn"
+                  autoFocus
+                  tabIndex={0}
+                  onClick={() => {
+                    // Restart current level after failure
+                    handleRestart(false, { restartAtCurrentLevel: true });
+                    setShowLevelCompleted(false);
+                    setShowLevelFailed(false);
+                  }}
+                >
+                  Restart
+                </button>
+              )}
             </div>
           </div>
         </div>
