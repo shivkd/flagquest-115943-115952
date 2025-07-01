@@ -2,27 +2,12 @@ import React, { useRef, useEffect, useState } from "react";
 import "./App.css";
 
 /*
-  ==============================
-  CARTOON SCI-FI STYLE INTEGRATION
-  ==============================
-  - Uses vibrant palette, pronounced visual polish, glow/shadow, roundness.
-  - All core palette colors are extracted from CSS variables (see App.css).
-  - Placeholder assets: Game elements are drawn as stylized, rounded shapes (to be swapped with assets later).
-  - Sound support: Use playSound helper to trigger SFX on important actions.
-  - To integrate custom SFX, add files to /src/assets/sfx/ and update playSound mapping.
-  - To integrate sprite art: Replace in-canvas drawing with drawing Image objects or Sprite components in future.
+  Simple 2D CTF Game: Minimal UI, basic player/enemy visuals. 
+  This file restores simple circle/oval-based character and bot design, 
+  and ensures bullets spawn from player and fire in current/last direction moved.
 */
 
-/**
- * PUBLIC_INTERFACE
- * FlagQuest: Full feature 2D capture-the-flag game, minimal UI.
- * - Player (WASD/arrows), multiple bots (unique paths), flag, drop zone, obstacles (level/difficulty).
- * - Minimalistic scoreboard, timer (90s), game/level state, buttons (Start, Pause, Restart).
- * - Colors: primary (#2196f3), secondary (#43a047), accent (#ff9800).
- * - Responsive for small screens.
- */
-
-/* ---- Constants, color palette from cartoon-sci-fi theme ---- */
+// ---- Constants ---- 
 const CANVAS_W = 440;
 const CANVAS_H = 320;
 
@@ -38,7 +23,7 @@ const BASE_NUM_BOTS = 2;
 const BASE_NUM_OBSTACLES = 0;
 const MAX_LEVEL = 8;
 
-// Pull cartoon sci-fi palette using CSS vars for consistent theming
+// Colors (fallbacks in case CSS not loaded)
 function getCssVar(v, fallback) {
   if (typeof window === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(v) || fallback;
@@ -47,18 +32,8 @@ const CLR_PRI = getCssVar('--sci-primary', '#46cbf9').trim() || "#46cbf9";
 const CLR_SEC = getCssVar('--sci-secondary', '#9bff4a').trim() || "#9bff4a";
 const CLR_ACC = getCssVar('--sci-accent', '#ffd44d').trim() || "#ffd44d";
 const CLR_BOT = getCssVar('--sci-magenta', '#ff7bfa').trim() || "#ff7bfa";
-const CLR_BOT_DARK = "#d13ce6";
 
-/* ---- Utility helpers ---- */
-
-
-// Compute a direction vector (normalized)
-function dirVec(dx, dy) {
-  let mag = Math.sqrt(dx * dx + dy * dy);
-  if (!mag) return { x: 1, y: 0 };
-  return { x: dx / mag, y: dy / mag };
-}
-
+// ---- Utility helpers ----
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
 }
@@ -89,32 +64,39 @@ function randomObstacleRect(w, h) {
     ox = margin + Math.random() * (w - ow - 2 * margin);
     oy = margin + Math.random() * (h - oh - 2 * margin);
     maxTry--;
-    // Don't start too close to "home zones"
   } while ((ox < 80 || ox + ow > w - 80) && maxTry > 0); 
   return { x: ox, y: oy, w: ow, h: oh };
 }
 
 // ---- Obstacle collision for circle (entity) ----
 function isCircleRectColliding(cx, cy, cr, ox, oy, ow, oh) {
-  // clamp cx/cy to nearest rectangle edge, check inside circle
   const nx = clamp(cx, ox, ox + ow), ny = clamp(cy, oy, oy + oh);
   const dx = cx - nx, dy = cy - ny;
   return dx*dx + dy*dy < cr*cr;
 }
 
-/* ---- Main Game State, including shooting/bullet/enemy HP additions ---- */
+// ---- Main Game State ----
 function App() {
   // --- Core state
   const [player, setPlayer] = useState({
-    x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0, isJumping: false,
-    jumpPhase: 0, facing: 1, isShooting: false, shootAnim: 0, canShoot: true
+    x: 60,
+    y: CANVAS_H / 2,
+    dx: 0,
+    dy: 0,
+    score: 0,
+    facing: 1,
+    lastMoveDir: { x: 1, y: 0 }, // used for shooting when standing still
+    canShoot: true,
+    isShooting: false,
+    shootAnim: 0,
+    isJumping: false,
+    jumpPhase: 0,
   });
   const [bots, setBots] = useState([]);
   const [flag, setFlag] = useState({ x: 0, y: 0, heldBy: null, home: true });
   const [dropBox, setDropBox] = useState(null);
   const [obstacles, setObstacles] = useState([]);
   const [level, setLevel] = useState(1);
-  const [difficulty, setDifficulty] = useState(1);
   const [timer, setTimer] = useState(SESSION_TIME);
   const [running, setRunning] = useState(false);
   const [gamestate, setGamestate] = useState("ready"); // "ready" "running" "paused" "over"
@@ -122,19 +104,15 @@ function App() {
   const [message, setMessage] = useState("");
   const [showLevelCompleted, setShowLevelCompleted] = useState(false);
   const [showLevelFailed, setShowLevelFailed] = useState(false);
-
-  // Shooting mechanic state
   const [bullets, setBullets] = useState([]);
-  // Track enemy HP: map bot.id to { hp: 3, hitAnim: 0 }
   const [enemyHp, setEnemyHp] = useState({});
 
   // --- Controls, Refs
   const canvasRef = useRef(null);
   const keyState = useRef({});
-  const mouseState = useRef({ mouseAngle: 0, mousePos: null }); // For extensibility (future enhancements: aim at mouse)
   const shootCooldown = useRef(false);
+  const lastDirectionRef = useRef({ x: 1, y: 0 }); // last movement direction (unit vec)
 
-  // --- Derived counts
   const numBots = BASE_NUM_BOTS + Math.floor((level - 1) / 2);
   const numObstacles = BASE_NUM_OBSTACLES + Math.max(level - 1, 0);
 
@@ -145,47 +123,37 @@ function App() {
     setFlag(newFlag);
     // Player at left, reset shooting/jump state
     setPlayer({
-      x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0, isJumping: false,
-      jumpPhase: 0, facing: 1, isShooting: false, shootAnim: 0, canShoot: true
+      x: 60,
+      y: CANVAS_H / 2,
+      dx: 0,
+      dy: 0,
+      facing: 1,
+      lastMoveDir: { x: 1, y: 0 },
+      canShoot: true,
+      isShooting: false,
+      shootAnim: 0,
+      isJumping: false,
+      jumpPhase: 0,
+      score: 0,
     });
-    // AI bots: staggered at right, new HP
+    // AI bots
     const botsArr = Array.from({ length: numBots }, (_, i) => ({
       id: i + 1,
       x: CANVAS_W - 40 - (i * 33),
       y: 1.4 * CANVAS_H / 3 + (i * 27),
-      dx: 0, dy: 0, score: 0,
-      params: {
-        offset: (i * Math.PI) / numBots,
-        swing: 18 + Math.random() * 11,
-        pursuitBias: 0.4 + 0.3 * (i / Math.max(numBots - 1, 1)),
-      },
-      isJumping: false, jumpPhase: 0
+      dx: 0,
+      dy: 0,
+      score: 0,
     }));
     setBots(botsArr);
-
     // Set HP for each bot (3 for each)
     let newHp = {};
     for (let b of botsArr) newHp[b.id] = { hp: 3, hitAnim: 0 };
     setEnemyHp(newHp);
 
     setDropBox(null);
-    const obsList = [];
-    let added = 0, tryCount = 0;
-    while (added < numObstacles && tryCount < 50) {
-      const obs = randomObstacleRect(CANVAS_W, CANVAS_H);
-      let overlaps = false;
-      if (dist(obs.x, obs.y, 60, CANVAS_H / 2) < 75 ||
-        dist(obs.x + obs.w, obs.y + obs.h, 60, CANVAS_H / 2) < 68)
-        overlaps = true;
-      if (!overlaps && dist(obs.x, obs.y, newFlag.x, newFlag.y) < 55)
-        overlaps = true;
-      if (!overlaps) {
-        obsList.push(obs);
-        added++;
-      }
-      tryCount++;
-    }
-    setObstacles(obsList);
+    // Obstacles (could expand logic, but not critical)
+    setObstacles([]);
     setBullets([]);
     setTimer(SESSION_TIME);
     setMessage("");
@@ -194,7 +162,7 @@ function App() {
     setRunning(false);
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, [level]);
 
   // --- Timer
@@ -212,24 +180,17 @@ function App() {
     return () => clearInterval(t);
   }, [running, timer]);
 
-  // --- Keyboard controls: listen while component active
+  // --- Keyboard controls ---
   useEffect(() => {
-    // --- Key/mouse controls: movement, jump/attack (space), shoot (J, K, mouse LMB)
     function handleDown(e) {
-      // Movement
+      // Movement keys
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
-      if (e.key === "p" || e.key === "P") { if(running) handlePause(); }
-      // JUMP (space)
-      if ((e.key === " " || e.key === "Spacebar") && !player.isJumping && running) {
-        setPlayer(pl => ({ ...pl, isJumping: true, jumpPhase: 0 }));
-      }
-      // SHOOT (J or K or Z, future: mouse)
-      if (["j","J","k","K","z","Z"].includes(e.key)) {
-        shootBullet();
-      }
+      if (e.key === "p" || e.key === "P") { if (running) handlePause(); }
+      // Shoot (J, K, Z) or mouse
+      if (["j", "J", "k", "K", "z", "Z"].includes(e.key)) { shootBullet(); }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -238,9 +199,7 @@ function App() {
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = false;
     }
     function handleMouseDown(e) {
-      if (e.button === 0 && running) {
-        shootBullet();
-      }
+      if (e.button === 0 && running) { shootBullet(); }
     }
     window.addEventListener("keydown", handleDown);
     window.addEventListener("keyup", handleUp);
@@ -250,15 +209,17 @@ function App() {
       window.removeEventListener("keyup", handleUp);
       window.removeEventListener("mousedown", handleMouseDown);
     };
-  // eslint-disable-next-line
-  }, [player.isJumping, running, player.canShoot]);
-  // --- Game logic loop (player/bots/flag/obstacles/collisions/progress/bullets/jump/attack) ---
+    // DO NOT add player to deps
+    // eslint-disable-next-line
+  }, [player.canShoot, running]);
+
+  // --- Main game loop (player, bots, flag, bullets, collisions) ---
   useEffect(() => {
     let anim;
     let prevTimestamp = performance.now();
 
     function isMoveAllowed(nx, ny, rad, obsList) {
-      for (let o of obsList) if (isCircleRectColliding(nx, ny, rad, o.x, o.y, o.w, o.h)) return false;
+      // No obstacles in minimal version
       if (nx < rad || ny < rad || nx > CANVAS_W - rad || ny > CANVAS_H - rad) return false;
       return true;
     }
@@ -275,131 +236,86 @@ function App() {
       if (keyState.current.down) pvy += PLAYER_SPEED;
       if (keyState.current.left) pvx -= PLAYER_SPEED;
       if (keyState.current.right) pvx += PLAYER_SPEED;
+      // Normalize for diagonal
+      let currentMove = { x: 0, y: 0 };
       if (pvx !== 0 || pvy !== 0) {
-        const nm = Math.sqrt(pvx * pvx + pvy * pvy) || 1;
-        pvx = (pvx / nm) * PLAYER_SPEED;
-        pvy = (pvy / nm) * PLAYER_SPEED;
+        const mag = Math.sqrt(pvx * pvx + pvy * pvy) || 1;
+        pvx = (pvx / mag) * PLAYER_SPEED;
+        pvy = (pvy / mag) * PLAYER_SPEED;
+        currentMove = { x: pvx / PLAYER_SPEED, y: pvy / PLAYER_SPEED }; // unit vector
+        lastDirectionRef.current = currentMove;
       }
-      // Flip player facing
+      // Facing left/right for bullet/visuals
       let lastFace = player.facing;
       if (pvx > 0) lastFace = 1;
       if (pvx < 0) lastFace = -1;
-      // Try new position, if not blocked
+      // Try new position
       if (isMoveAllowed(px + pvx, py + pvy, PLAYER_SIZE / 2, obstacles)) {
         px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
         py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
       }
-      else {
-        if (isMoveAllowed(px + pvx, py, PLAYER_SIZE / 2, obstacles)) px += pvx;
-        else if (isMoveAllowed(px, py + pvy, PLAYER_SIZE / 2, obstacles)) py += pvy;
-      }
 
-      // --- Jump Animation Progress ---
-      let plJumpPhase = player.jumpPhase, plIsJump = player.isJumping;
-      if (plIsJump) {
-        plJumpPhase += 0.14 * (delta / 16.7); // speed up or slow down as appropriate
-        // When jump completes, reset
-        if (plJumpPhase > Math.PI) {
-          plIsJump = false;
-          plJumpPhase = 0;
-        }
-      }
+      // Store last movement direction on the player (for bullets)
+      let newLastMoveDir = (pvx !== 0 || pvy !== 0)
+        ? { x: pvx / PLAYER_SPEED, y: pvy / PLAYER_SPEED }
+        : player.lastMoveDir;
 
-      // --- Shooting Animation/Cooldown Progress ---
-      let plShootAnim = player.shootAnim;
-      let plIsShoot = player.isShooting;
-      let canShoot = player.canShoot;
-      if (plIsShoot) {
-        plShootAnim += Math.PI / 5;
-        if (plShootAnim > Math.PI) {
-          plIsShoot = false;
-          plShootAnim = 0;
-        }
-      }
-
-      // --- Bots AI & Jump Animation ---
-      let botArr = bots.map((bot, i, allBots) => {
-        let { params } = bot;
-        let tgtX = player.x;
-        let tgtY = player.y;
+      // --- Bots AI (crude homing on player) ---
+      let botArr = bots.map((bot, i) => {
+        let tgtX = px, tgtY = py;
         let speed = BASE_BOT_SPEED + 0.09 * (level - 1) + 0.12 * (i);
-        let bias = params.pursuitBias + .33 * (level - 1) / MAX_LEVEL;
-        let angle = Math.atan2(tgtY - bot.y, tgtX - bot.x);
-        angle += Math.sin(performance.now()/900 + params.offset * 3) * (0.08 + 0.03 * i);
-        let swingDist = params.swing + 3.2 * level;
-        let toAvoid = allBots.reduce((sum, ob) => ob !== bot && dist(bot.x, bot.y, ob.x, ob.y) < 22 ? sum + Math.sign(bot.x - ob.x) : sum, 0);
-        if (toAvoid) angle += 0.11 * toAvoid;
-        let wantX = bot.x + Math.cos(angle) * speed * bias + Math.cos(angle + 1.5) * speed * (1 - bias) * 0.49 + toAvoid;
-        let wantY = bot.y + Math.sin(angle) * speed * bias + Math.sin(angle + 1.7) * speed * (1 - bias) * 0.51 + toAvoid;
-        let ballRad = BOT_SIZE / 2;
-        // Bots jump with a random chance (future: more intelligent)
-        let bIsJump = bot.isJumping, bJumpPhase = bot.jumpPhase;
-        if (!bIsJump && Math.random() < 0.018 && Math.abs(wantY - bot.y) > 4) bIsJump = true;
-        if (bIsJump) {
-          bJumpPhase += 0.10 * (delta / 16.7);
-          if (bJumpPhase > Math.PI) { bIsJump = false; bJumpPhase = 0; }
-        }
-        // Move as usual
-        if (isMoveAllowed(wantX, wantY, ballRad, obstacles)) {
-          return { ...bot, x: clamp(wantX, ballRad, CANVAS_W - ballRad), y: clamp(wantY, ballRad, CANVAS_H - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
-        } else if (isMoveAllowed(bot.x + speed, bot.y, ballRad, obstacles)) {
-          return { ...bot, x: clamp(bot.x + speed, ballRad, CANVAS_W - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
-        } else if (isMoveAllowed(bot.x, bot.y + speed, ballRad, obstacles)) {
-          return { ...bot, y: clamp(bot.y + speed, ballRad, CANVAS_H - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
-        }
-        return { ...bot, isJumping: bIsJump, jumpPhase: bJumpPhase };
+        let dx = tgtX - bot.x, dy = tgtY - bot.y;
+        let mag = Math.sqrt(dx * dx + dy * dy) || 1;
+        let vx = (dx / mag) * speed, vy = (dy / mag) * speed;
+        let nx = clamp(bot.x + vx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
+        let ny = clamp(bot.y + vy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
+        return { ...bot, x: nx, y: ny };
       });
 
-      // --- Bullets: move, animate, handle collisions with bots ---
+      // --- Bullets: move, check collision with bots, remove bullets on hit/out-of-bounds ---
       let newBullets = [];
       let newEnemyHp = { ...enemyHp };
-      let anyBotHit = false;
-      let hpDelta = false;
       let botsToDefeat = new Set();
-
       for (let bullet of bullets) {
-        // Move bullet along vx, vy
         let bx = bullet.x + bullet.vx, by = bullet.y + bullet.vy;
-        // Out of range? (max 520px from fire origin)
         let traveled = dist(bullet.origin.x, bullet.origin.y, bx, by);
         let dead = false;
-        if (bx < 0 || by < 0 || bx > CANVAS_W || by > CANVAS_H || traveled > 520) dead = true;
-        // Check collision with bots if bullet still alive
+        if (
+          bx < 0 ||
+          by < 0 ||
+          bx > CANVAS_W ||
+          by > CANVAS_H ||
+          traveled > 520
+        )
+          dead = true;
+        // Hit enemy bot?
         let hitBotIdx = -1;
         bots.forEach((b, i) => {
-          if (dist(b.x, b.y, bx, by) < BOT_SIZE/2 + 8 && !dead && (newEnemyHp[b.id]?.hp > 0)) {
+          if (
+            dist(b.x, b.y, bx, by) < BOT_SIZE / 2 + 8 && !dead &&
+            (newEnemyHp[b.id]?.hp > 0)
+          ) {
             hitBotIdx = i;
-            anyBotHit = true;
           }
         });
         if (hitBotIdx !== -1) {
           let bot = bots[hitBotIdx];
           let hpEnt = newEnemyHp[bot.id] || { hp: 3, hitAnim: 0 };
-          hpEnt.hp -= 1; // lose HP
-          hpEnt.hitAnim = 1.0; // flash animation
+          hpEnt.hp -= 1;
+          hpEnt.hitAnim = 1.0;
           newEnemyHp[bot.id] = hpEnt;
-          // If HP drops to 0, mark bot for defeat
           if (hpEnt.hp <= 0) botsToDefeat.add(bot.id);
-          hpDelta = true;
-          continue; // Bullet is destroyed on hit
+          continue;
         }
         if (!dead) newBullets.push({ ...bullet, x: bx, y: by, age: bullet.age + 1 });
       }
+      // Remove defeated bots
+      let remainingBots = botArr.filter(b => !botsToDefeat.has(b.id));
+      Object.keys(newEnemyHp).forEach(
+        id => (newEnemyHp[id].hitAnim = Math.max(0, newEnemyHp[id].hitAnim - 0.12))
+      );
 
-      // --- Enemy defeat removal ---
-      let remainingBots = botArr.filter(b => !(botsToDefeat.has(b.id)));
-      if (botsToDefeat.size) {
-        // Spark "defeat" animation? (future: add visual effect), currently just remove
-      }
-
-      // --- Enemy hit animation timer decay ---
-      for (let k in newEnemyHp) {
-        if (newEnemyHp[k].hitAnim > 0) {
-          newEnemyHp[k] = { ...newEnemyHp[k], hitAnim: Math.max(0, newEnemyHp[k].hitAnim - 0.12) };
-        }
-      }
-
-      // --- Check player collision with flag, etc ---
+      // --- Flag pickup/drop/score ---
       let newFlag = { ...flag };
       if (!flag.heldBy && dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2) {
         newFlag.heldBy = "player";
@@ -407,21 +323,23 @@ function App() {
         setDropBox(randomDropBox(CANVAS_W, CANVAS_H, 58));
       }
 
-      // --- Bots catch player (game over) ---
-      let botCaught = false;
-      for (let b of remainingBots) {
-        if (dist(px, py, b.x, b.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) botCaught = true;
-      }
-
-      // --- Drop box/score completion ---
       let playerScored = false;
-      if (flag.heldBy === "player" && dropBox && dist(px, py, dropBox.x, dropBox.y) < (PLAYER_SIZE + DROP_BOX_SIZE)/2 + 4) {
+      if (
+        flag.heldBy === "player" &&
+        dropBox &&
+        dist(px, py, dropBox.x, dropBox.y) < (PLAYER_SIZE + DROP_BOX_SIZE) / 2 + 4
+      ) {
         playerScored = true;
       }
 
-      // --- Level/game state ---
+      let botCaught = false;
+      for (let b of remainingBots) {
+        if (dist(px, py, b.x, b.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2)
+          botCaught = true;
+      }
+
+      // --- Win/Lose logic ---
       let newPlayerScore = player.score;
-      let newWin = null;
       if (playerScored) {
         newPlayerScore += 1;
         setShowLevelCompleted(true);
@@ -437,7 +355,6 @@ function App() {
         setGamestate("postlevel");
       }
       if (botCaught) {
-        newWin = "bot";
         setGamestate("over");
         setWinner("bot");
         setShowLevelFailed(true);
@@ -447,430 +364,72 @@ function App() {
         setGamestate("failed");
       }
 
-      // Flag follows player if holding
       if (newFlag.heldBy === "player") {
-        newFlag.x = px; newFlag.y = py;
+        newFlag.x = px;
+        newFlag.y = py;
       }
 
-      // --- Apply state updates for animation/FX ---
       setPlayer(p => ({
-        ...p, x: px, y: py, score: newPlayerScore,
+        ...p,
+        x: px,
+        y: py,
+        score: newPlayerScore,
         facing: lastFace,
-        isJumping: plIsJump, jumpPhase: plJumpPhase,
-        isShooting: plIsShoot, shootAnim: plShootAnim
+        lastMoveDir: newLastMoveDir,
       }));
       setBots(remainingBots);
       setFlag(newFlag);
       setBullets(newBullets);
       setEnemyHp(newEnemyHp);
 
-      // Re-frame game if not won/lost
-      if (!newWin && !playerScored && gamestate === "running")
+      if (gamestate === "running" && !playerScored && !botCaught)
         anim = requestAnimationFrame(gameTick);
     }
     if (gamestate === "running") anim = requestAnimationFrame(gameTick);
     return () => { if (anim) cancelAnimationFrame(anim); };
-  // eslint-disable-next-line
+    // eslint-disable-next-line
   }, [gamestate, running, player, bots, flag, dropBox, obstacles, level, bullets, enemyHp]);
 
-  // --- Bullet shooting API ---
   // PUBLIC_INTERFACE
   function shootBullet() {
     // Gun cooldown (350ms)
     if (!player.canShoot || !running) return;
     let px = player.x, py = player.y;
-    // Facing: right or left, for extensibility could use mouse for aim
-    let dir = { x: player.facing, y: 0 };
-    // Future: aim via mouse angle in mouseState, for now just left/right
+    // DIRECTION:
+    // If moving, shoot in that direction. If standing, shoot in last moved direction.
+    let moveDir = player.lastMoveDir && (player.lastMoveDir.x !== 0 || player.lastMoveDir.y !== 0)
+      ? player.lastMoveDir
+      : lastDirectionRef.current || { x: 1, y: 0 }; // default to right
+    // If not moving, use facing left/right for backward compatibility
+    if (moveDir.x === 0 && moveDir.y === 0) moveDir = { x: player.facing, y: 0 };
+    // Normalize
+    let mag = Math.sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y) || 1;
+    let dir = { x: moveDir.x / mag, y: moveDir.y / mag };
     let vx = dir.x * 8.7, vy = dir.y * 8.7;
-    // Bullet spawns at gun tip
-    let gunTipX = px + dir.x * (PLAYER_SIZE/2 + 11), gunTipY = py - 8;
-    setBullets(bu => [...bu, {
-      x: gunTipX, y: gunTipY,
-      vx, vy,
-      origin: { x: px, y: py },
-      age: 0
-    }]);
+    // Bullet spawns at player center
+    setBullets(bu => [
+      ...bu,
+      {
+        x: px,
+        y: py,
+        vx,
+        vy,
+        origin: { x: px, y: py },
+        age: 0,
+      },
+    ]);
     setPlayer(pl => ({
-      ...pl, isShooting: true, shootAnim: 0, canShoot: false
+      ...pl,
+      isShooting: true,
+      shootAnim: 0,
+      canShoot: false,
     }));
-    // Cooldown
     shootCooldown.current = true;
     setTimeout(() => {
       shootCooldown.current = false;
       setPlayer(pl => ({ ...pl, canShoot: true }));
     }, 350);
   }
-
-    // --- defeat animation state for player robot ---
-  const [robotDefeatAnim, setRobotDefeatAnim] = useState(false);
-  const [robotDefeatAnimFrame, setRobotDefeatAnimFrame] = useState(0);
-
-  // --- defeat animation trigger when level is completed ---
-  useEffect(() => {
-    if (showLevelCompleted) {
-      setRobotDefeatAnim(true);
-      setRobotDefeatAnimFrame(0);
-    } else if (!showLevelCompleted) {
-      setRobotDefeatAnim(false);
-      setRobotDefeatAnimFrame(0);
-    }
-  }, [showLevelCompleted]);
-
-  // --- Rendering the canvas/game area (Full drawing logic restored) ---
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-
-    // Field background
-    ctx.fillStyle = "#f9fbfc";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-    // Draw obstacles (grey blocks, subtle border)
-    for (const obs of obstacles) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect
-        ? ctx.roundRect(obs.x, obs.y, obs.w, obs.h, 10)
-        : ctx.rect(obs.x, obs.y, obs.w, obs.h); // fallback for older ctx
-      ctx.fillStyle = "#2d334b";
-      ctx.shadowColor = "#46cbf94a";
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 3.2;
-      ctx.strokeStyle = "#303865";
-      ctx.globalAlpha = 0.66;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Draw drop box area (deliver flag here)
-    if (dropBox) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(dropBox.x, dropBox.y, DROP_BOX_SIZE / 2, 0, 2 * Math.PI);
-      ctx.globalAlpha = 0.51;
-      ctx.fillStyle = "#7bffa6";
-      ctx.shadowColor = "#9bff4a";
-      ctx.shadowBlur = 13;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 3.3;
-      ctx.strokeStyle = "#50e968";
-      ctx.stroke();
-      // "Drop" emoji
-      ctx.font = "800 22px Arial";
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#202";
-      ctx.globalAlpha = 0.92;
-      ctx.fillText("⬇️", dropBox.x, dropBox.y + 8);
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Draw flag (🏳️ emoji or stylized shape)
-    if (flag && !flag.heldBy) {
-      ctx.save();
-      ctx.translate(flag.x, flag.y);
-      ctx.beginPath();
-      ctx.arc(0, 0, FLAG_SIZE/2, 0, 2 * Math.PI);
-      ctx.fillStyle = CLR_ACC;
-      ctx.shadowColor = "#ffd44d";
-      ctx.shadowBlur = 20;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 2.1;
-      ctx.strokeStyle = "#ffe576";
-      ctx.stroke();
-      // Draw stylized flagpole
-      ctx.beginPath();
-      ctx.moveTo(0, FLAG_SIZE/2);
-      ctx.lineTo(0, FLAG_SIZE/2 + 13);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#ffda44";
-      ctx.stroke();
-      ctx.font = "bold 19px Arial";
-      ctx.fillStyle = "#303865";
-      ctx.globalAlpha = 0.95;
-      ctx.fillText("🏳️", 0, -2);
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Draw bullets (blaster shots)
-    for (const bullet of bullets) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = "#ffd44d";
-      ctx.shadowColor = "#ffe576";
-      ctx.shadowBlur = 18;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Draw bots
-    for (const bot of bots) {
-      ctx.save();
-      ctx.translate(bot.x, bot.y);
-      // Jumping anim
-      let bJumpYOffset = bot.isJumping
-        ? -Math.abs(Math.sin(bot.jumpPhase)) * 18
-        : 0;
-      ctx.translate(0, bJumpYOffset);
-
-      // Shadow
-      ctx.save();
-      ctx.globalAlpha = bot.isJumping
-        ? 0.15 + 0.24 * Math.abs(Math.cos(bot.jumpPhase))
-        : 0.39;
-      ctx.beginPath();
-      ctx.ellipse(0, 28, 14, 6, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#900a982b";
-      ctx.filter = "blur(0.6px)";
-      ctx.fill();
-      ctx.filter = "none";
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // Body
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, 0, BOT_SIZE / 2, 0, 2 * Math.PI);
-      // Hit animation/flicker
-      let hpEnt = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
-      if (hpEnt.hitAnim > 0.1) {
-        ctx.globalAlpha = 0.54 + 0.4 * Math.abs(Math.cos(hpEnt.hitAnim*21));
-        ctx.shadowColor = "#fff";
-        ctx.shadowBlur = 18;
-      }
-      ctx.fillStyle = CLR_BOT;
-      ctx.strokeStyle = CLR_BOT_DARK;
-      ctx.lineWidth = 2.8;
-      ctx.shadowColor = "#ffabfd";
-      ctx.shadowBlur = 14;
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // Face/eye
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, -1, 5.7, 0, Math.PI * 2);
-      ctx.fillStyle = "#f0f6ff";
-      ctx.fill();
-      // Pupils
-      ctx.beginPath();
-      ctx.arc(-1.7, -1, 1.3, 0, Math.PI * 2);
-      ctx.arc(1.7, -1, 1.3, 0, Math.PI * 2);
-      ctx.fillStyle = "#474da7";
-      ctx.fill();
-      ctx.restore();
-
-      // Enemy HP (tracking dots above head)
-      ctx.save();
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(-7 + i * 7, -18, 2.5, 0, 2 * Math.PI);
-        ctx.fillStyle = (hpEnt.hp > i) ? "#fff" : "#808088";
-        ctx.globalAlpha = 0.8;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-
-      ctx.restore();
-    }
-
-    // --- PLAYER: defeat animation for player robot when level completed ---
-    if (robotDefeatAnim && showLevelCompleted) {
-      // ... (unchanged defeat animation) ...
-      // [omitted for brevity, already present/working above]
-    }
-    else {
-      // ----- NORMAL PLAYER RENDER FLOW (draw main character) -----
-      ctx.save();
-      ctx.translate(player.x, player.y);
-
-      // --- JUMP: vertical offset for body/limbs ---
-      let jumpYOffset = player.isJumping
-        ? -Math.abs(Math.sin(player.jumpPhase)) * 22
-        : 0;
-
-      ctx.translate(0, jumpYOffset);
-
-      // --- SHADOW: Player shadow (soft oval) ---
-      ctx.save();
-      ctx.globalAlpha = player.isJumping
-        ? 0.21 + 0.15 * Math.abs(Math.cos(player.jumpPhase))
-        : 0.39;
-      let shadowWidth = player.isJumping
-        ? 15 + 7 * Math.cos(player.jumpPhase)
-        : 23;
-      ctx.beginPath();
-      ctx.ellipse(0, 32, shadowWidth, 7, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#1581ab29";
-      ctx.filter = "blur(1.5px)";
-      ctx.fill();
-      ctx.filter = "none";
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // --- Running/JUMPING phase for limbs/torso/face ---
-      let moving =
-        (keyState.current.up || keyState.current.down || keyState.current.left ||
-          keyState.current.right) && gamestate === "running";
-      let t = performance.now() / 430;
-      let limbCycle = moving ? t * 3.6 : 0;
-      let legSwing = moving ? Math.sin(limbCycle) * 18 : 0;
-      let legKick = moving ? Math.cos(limbCycle) * 15 : 0;
-      let armSwing = moving ? Math.cos(limbCycle) * 17 : 0;
-      let bodyTilt = moving ? Math.sin(limbCycle) * 3 : 0;
-      if (player.isJumping) {
-        bodyTilt -= Math.sin(player.jumpPhase) * 6;
-        armSwing += Math.sin(player.jumpPhase) * 7;
-      }
-
-      let outerGlow = moving ? "#18eaff" : "#6cf9ea";
-      ctx.rotate(bodyTilt * Math.PI / 180);
-
-      // Draw torso
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(0, 10, 10, 15, 0, 0, 2 * Math.PI);
-      let torsoGrad = ctx.createLinearGradient(-13, 0, 14, 31);
-      torsoGrad.addColorStop(0.03, "#57e8ff");
-      torsoGrad.addColorStop(0.38, CLR_PRI);
-      torsoGrad.addColorStop(1, "#eaf7ff");
-      ctx.fillStyle = torsoGrad;
-      ctx.shadowColor = outerGlow;
-      ctx.shadowBlur = 14;
-      ctx.globalAlpha = 0.97;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // Arms
-      [{ dx: -15, dy: 2, rot: -0.46 + armSwing/55 }, { dx: 15, dy: 2, rot: 0.46 - armSwing/55 }].forEach((a, i) => {
-        ctx.save();
-        ctx.translate(a.dx, a.dy);
-        ctx.rotate(a.rot);
-        ctx.beginPath();
-        ctx.ellipse(0, 11, 6, 16, 0, 0, 2 * Math.PI);
-        ctx.fillStyle = "#b6fdff";
-        ctx.globalAlpha = 0.86;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      });
-
-      // Head
-      ctx.save();
-      ctx.translate(0, -12);
-      ctx.beginPath();
-      ctx.arc(0, 0, 13, 0, 2 * Math.PI);
-      let gradHead = ctx.createRadialGradient(0, 0, 5, 0, 0, 13);
-      gradHead.addColorStop(0, "#fffecb");
-      gradHead.addColorStop(0.51, CLR_PRI);
-      gradHead.addColorStop(1, "#2196f3");
-      ctx.fillStyle = gradHead;
-      ctx.shadowColor = "#fff";
-      ctx.shadowBlur = 7;
-      ctx.globalAlpha = 0.84;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-
-      // Eyes
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(-4, -3, 2.5, 0, Math.PI*2);
-      ctx.arc( 4, -3, 2.5, 0, Math.PI*2);
-      ctx.fillStyle = "#fff";
-      ctx.shadowColor="#fff";
-      ctx.globalAlpha = 0.6;
-      ctx.shadowBlur=2;
-      ctx.fill();
-      ctx.globalAlpha = 1; ctx.shadowBlur=0;
-      ctx.beginPath();
-      ctx.arc(-3.7, -3, 1.05, 0, Math.PI*2);
-      ctx.arc( 4.1, -3, 1.05, 0, Math.PI*2);
-      ctx.fillStyle = "#25c8e6";
-      ctx.globalAlpha = 0.7;
-      ctx.fill();
-      ctx.globalAlpha = 1; ctx.restore();
-
-      // Mouth/visor
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(0, 4, 5.4, 2.2, 0, 0, Math.PI*2);
-      ctx.fillStyle = "#fff";
-      ctx.globalAlpha = 0.32;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      ctx.restore();
-
-      // Legs
-      [{ dx:-5, dy:27, ang:0.16+legKick/36 },{ dx:5, dy:27, ang:-0.13-legKick/39 }].forEach((l,i) => {
-        ctx.save();
-        ctx.translate(l.dx, l.dy);
-        ctx.rotate(l.ang);
-        ctx.beginPath();
-        ctx.ellipse(0, 6, 5, 15, 0, 0, Math.PI*2);
-        ctx.fillStyle = "#c1f9ff";
-        ctx.globalAlpha = 0.84;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      });
-
-      // Holding flag (draw flag if attached to player)
-      if (flag && flag.heldBy === "player") {
-        ctx.save();
-        ctx.translate(17, 8);
-        ctx.beginPath();
-        ctx.arc(0, 0, FLAG_SIZE/2, 0, 2 * Math.PI);
-        ctx.fillStyle = CLR_ACC;
-        ctx.shadowColor = "#ffd44d";
-        ctx.shadowBlur = 17;
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "#ffe576";
-        ctx.stroke();
-        ctx.font = "bold 17px Arial";
-        ctx.fillStyle = "#303865";
-        ctx.globalAlpha = 0.94;
-        ctx.fillText("🏳️", 0, 2);
-        ctx.globalAlpha = 1;
-        ctx.restore();
-      }
-
-      // Name label
-      ctx.save();
-      ctx.globalAlpha = 0.8;
-      ctx.font = "bold 17px Poppins, Arial";
-      ctx.fillStyle = "#1976d2";
-      ctx.textAlign = "center";
-      ctx.fillText("You", 0, -21);
-      ctx.restore();
-
-      ctx.restore();
-    }
-  // End of restored full rendering effect
-  }, [player, bots, flag, gamestate, winner, dropBox, obstacles, bullets, enemyHp, showLevelCompleted, robotDefeatAnim, robotDefeatAnimFrame]);
 
   // --- Button actions
   // PUBLIC_INTERFACE
@@ -892,7 +451,6 @@ function App() {
   };
 
   // PUBLIC_INTERFACE
-  // add options: { restartAtCurrentLevel: boolean }
   const handleRestart = (autoStart = false, options = {}) => {
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
@@ -900,30 +458,26 @@ function App() {
     setMessage("");
     keyState.current = {};
     if (options && options.restartAtCurrentLevel) {
-      // Remain at current level, only reset game field and timer
       setTimer(SESSION_TIME);
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
     } else {
-      // Reset to first level
-      setLevel(1);    // resets/initializes everything (and obstacles)
+      setLevel(1);
       setTimer(SESSION_TIME);
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
     }
   };
 
-  // --- Render: UI overlay info
+  // --- Render UI info
   const pad = n => String(n).padStart(2, "0");
   const timerStr = `${pad(Math.floor(timer / 60))}:${pad(timer % 60)}`;
-
   let statusMsg = message;
   if (!statusMsg && (flag.heldBy === "player" && dropBox))
     statusMsg = "Deliver the flag to the drop-off box!";
   if (!statusMsg && gamestate === "paused")
     statusMsg = "Game paused.";
 
-  // Show overlay for completed/failed state instead of just message bar
   let showLevelOverlay = showLevelCompleted || showLevelFailed;
   let levelOverlayMsg = "";
   let overlayColor = "";
@@ -934,13 +488,205 @@ function App() {
     levelOverlayMsg = "You Failed!";
     overlayColor = "#e74c3c";
   }
-
-  // Level = points per win, difficulty scales by obstacles and bots
   const pointsForLevel = level;
   const userScore = player.score;
   const botTopScore = Math.max(0, ...bots.map(b => b.score));
   let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
 
+  // ---- CANVAS RENDER LOGIC (minimal version ----
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Field background
+    ctx.fillStyle = "#f9fbfc";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Obstacles (optional/minimal)
+    // (skipped for basic visual clarity)
+
+    // Drop box area (if exists)
+    if (dropBox) {
+      ctx.save();
+      ctx.globalAlpha = 0.51;
+      ctx.beginPath();
+      ctx.arc(dropBox.x, dropBox.y, DROP_BOX_SIZE / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = "#7bffa6";
+      ctx.shadowColor = "#9bff4a";
+      ctx.shadowBlur = 9;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 3.3;
+      ctx.strokeStyle = "#50e968";
+      ctx.stroke();
+      ctx.font = "800 22px Arial";
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#202";
+      ctx.globalAlpha = 0.92;
+      ctx.fillText("⬇️", dropBox.x, dropBox.y + 8);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Draw flag (free-standing)
+    if (flag && !flag.heldBy) {
+      ctx.save();
+      ctx.translate(flag.x, flag.y);
+      ctx.beginPath();
+      ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = CLR_ACC;
+      ctx.fill();
+      ctx.lineWidth = 2.1;
+      ctx.strokeStyle = "#ffe576";
+      ctx.stroke();
+      // Emoji flag as marker
+      ctx.font = "bold 18px Arial";
+      ctx.fillStyle = "#303865";
+      ctx.globalAlpha = 0.97;
+      ctx.fillText("🏳️", 0, 5);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Draw bullets (blaster shots, yellow dots)
+    for (const bullet of bullets) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffd44d";
+      ctx.shadowColor = "#ffe576";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Draw bots (simple: single magenta circle + eye, no fancy limbs/animations)
+    for (const bot of bots) {
+      ctx.save();
+      ctx.translate(bot.x, bot.y);
+      // Body
+      ctx.beginPath();
+      ctx.arc(0, 0, BOT_SIZE / 2, 0, 2 * Math.PI);
+      let hpEnt = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
+      if (hpEnt.hitAnim > 0.1) {
+        ctx.globalAlpha = 0.55 + 0.4 * Math.abs(Math.cos(hpEnt.hitAnim * 21));
+      }
+      ctx.fillStyle = CLR_BOT;
+      ctx.strokeStyle = "#b843ac";
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = "#ffabfd";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      // Eye
+      ctx.beginPath();
+      ctx.arc(0, -3, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0, -3, 2, 0, Math.PI * 2);
+      ctx.fillStyle = "#474da7";
+      ctx.fill();
+      // HP dots above head
+      ctx.save();
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(-7 + i * 7, -18, 2.4, 0, 2 * Math.PI);
+        ctx.fillStyle = (hpEnt.hp > i) ? "#fff" : "#808088";
+        ctx.globalAlpha = 0.8;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+      ctx.restore();
+    }
+
+    // Draw Player (simple circle + color band)
+    ctx.save();
+    ctx.translate(player.x, player.y);
+
+    // Shadow (simple ellipse, offset downward)
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.ellipse(0, 16, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#1581ab29";
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(0, 0, PLAYER_SIZE / 2, 0, 2 * Math.PI);
+    ctx.fillStyle = CLR_PRI;
+    ctx.shadowColor = "#6cf9ea";
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2.1;
+    ctx.strokeStyle = "#11bcef";
+    ctx.stroke();
+
+    // Face band (oval/helmet visor)
+    ctx.beginPath();
+    ctx.ellipse(0, -5, 8, 3, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.22;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Small eyes
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(-4, -5, 1.7, 0, Math.PI * 2);
+    ctx.arc( 4, -5, 1.7, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+    ctx.globalAlpha = 1; ctx.restore();
+
+    // Holding a flag?
+    if (flag && flag.heldBy === "player") {
+      ctx.save();
+      ctx.translate(13, 8);
+      ctx.beginPath();
+      ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
+      ctx.fillStyle = CLR_ACC;
+      ctx.shadowColor = "#ffd44d";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffe576";
+      ctx.stroke();
+      ctx.font = "bold 15px Arial";
+      ctx.fillStyle = "#303865";
+      ctx.globalAlpha = 0.98;
+      ctx.fillText("🏳️", 0, 4);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // Name label (above, small)
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.font = "bold 14px Poppins, Arial";
+    ctx.fillStyle = "#1976d2";
+    ctx.textAlign = "center";
+    ctx.fillText("You", 0, -17);
+    ctx.restore();
+
+    ctx.restore();
+    // End of drawing
+  }, [player, bots, flag, gamestate, winner, dropBox, obstacles, bullets, enemyHp, showLevelCompleted, showLevelFailed]);
+
+  // --- Render: UI overlay info
   return (
     <div className="App">
       <header>
@@ -1045,11 +791,9 @@ function App() {
                     autoFocus
                     tabIndex={0}
                     onClick={() => {
-                      // Advance to next level
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
                       setLevel(lvl => lvl + 1);
-                      // Future: trigger full-screen sparkle!
                     }}
                   >
                     Continue
@@ -1058,7 +802,6 @@ function App() {
                     className="game-btn"
                     tabIndex={0}
                     onClick={() => {
-                      // Restart at current level
                       handleRestart(false, { restartAtCurrentLevel: true });
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
@@ -1074,7 +817,6 @@ function App() {
                   autoFocus
                   tabIndex={0}
                   onClick={() => {
-                    // Restart current level after failure
                     handleRestart(false, { restartAtCurrentLevel: true });
                     setShowLevelCompleted(false);
                     setShowLevelFailed(false);
@@ -1104,7 +846,6 @@ function App() {
           {statusMsg}
         </div>
       )}
-
       <main
         style={{
           display: "flex",
@@ -1151,7 +892,7 @@ function App() {
             aria-label="Game Canvas"
           />
         </div>
-        {/* ---- Game Instructions (NEW, always shown) ---- */}
+        {/* ---- Instructions Panel ---- */}
         <div
           className="instructions-panel"
           style={{
@@ -1170,7 +911,7 @@ function App() {
             position: "relative"
           }}
         >
-          <div style={{fontWeight: 700, color: "var(--accent, #ffd44d)", fontSize: "1.13em", marginBottom: 6, letterSpacing: "0.02em", textShadow: "0 1.6px 2px #101 22"}}>
+          <div style={{fontWeight: 700, color: "var(--accent, #ffd44d)", fontSize: "1.13em", marginBottom: 6, letterSpacing: "0.02em"}}>
             How to Play
           </div>
           <ul style={{margin: 0, paddingLeft: "1.1em", listStyle: "disc"}}>
@@ -1179,24 +920,20 @@ function App() {
               <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd>
             </li>
             <li>
-              <span style={{ color: "#ffd44d", fontWeight: 600 }}>Jump</span>:&nbsp;
-              <kbd>Space</kbd>
-            </li>
-            <li>
-              <span style={{ color: "#ff3645", fontWeight: 600 }}>Shoot</span>:&nbsp;
+              <span style={{ color: "#ffd44d", fontWeight: 600 }}>Shoot</span>:&nbsp;
               <kbd>J</kbd>&nbsp;/&nbsp;<kbd>K</kbd>&nbsp;/&nbsp;<kbd>Z</kbd> or <span style={{color:"#ffd44d"}}>Mouse Click</span>
             </li>
             <li>
               <span style={{ color: "#46cbf9", fontWeight: 600 }}>Grab</span> the flag (🏳️), deliver it to the <span style={{color:"#9bff4a"}}>Drop-Off Box</span> to win the level!
             </li>
             <li>
-              <span style={{color: "#ff7bfa", fontWeight: 600}}>Watch out!</span> Avoid enemy bots. More bots & obstacles as you level up.
+              <span style={{color: "#ff7bfa", fontWeight: 600}}>Watch out!</span> Avoid enemy bots. More bots as you level up.
             </li>
             <li style={{ fontSize: ".97em", color: "#c2eafd" }}>
               <span style={{color:"#ffd44d"}}>Extras:</span>
               <span style={{marginLeft:8}}><kbd>P</kbd> = Pause</span>
               <span style={{marginLeft:12}}><kbd>R</kbd> = Restart</span>
-              <span style={{marginLeft:12, color:"#ccc"}}>Points/level, bots and obstacles increase every round.</span>
+              <span style={{marginLeft:12, color:"#ccc"}}>Points/level and bots increase every round.</span>
             </li>
           </ul>
         </div>
@@ -1208,8 +945,7 @@ function App() {
             flexWrap: "wrap"
           }}
         >
-          {/* Show appropriate action button(s) depending on game state */}
-          {/* While overlay is up (level complete or failed), only show relevant action button */}
+          {/* Overlay logic */}
           {showLevelCompleted && !showLevelFailed && (
             <button
               className="game-btn"
@@ -1240,7 +976,7 @@ function App() {
               Restart
             </button>
           )}
-          {/* In normal play, show core controls */}
+          {/* In normal play */}
           {!showLevelCompleted && !showLevelFailed && (
             <>
               <button
@@ -1273,15 +1009,15 @@ function App() {
           )}
         </div>
         <div style={{ marginTop: "1.1rem", color: "#888", fontSize: 14 }}>
-          Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.
-          &nbsp; Grab the flag, deliver to drop-off box!
+          Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.{" "}
+          Grab the flag, deliver to drop-off box!
           <br />
-          Avoid bots (each with unique strategy). More bots & obstacles as you level up.
+          Avoid bots. More bots as you level up.
           <br />
           <span style={{color:'#aaa',fontSize:13}}>Level up for tougher competition.&nbsp;P: Pause &nbsp; R: Restart</span>
         </div>
         <div style={{ marginTop: "0.8rem", color: "#bbb", fontSize: 13 }}>
-          Points per level: {pointsForLevel} &bull; Obstacles: {numObstacles} &bull; Bots: {numBots}
+          Points per level: {pointsForLevel} &bull; Bots: {numBots}
         </div>
       </main>
     </div>
