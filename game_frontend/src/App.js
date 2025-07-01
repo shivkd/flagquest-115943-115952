@@ -797,32 +797,69 @@ function App() {
             flexWrap: "wrap"
           }}
         >
-          <button
-            className="game-btn"
-            tabIndex={0}
-            onClick={handleStart}
-            disabled={gamestate === "running"}
-            aria-label="Start Game"
-          >
-            {btnLbl}
-          </button>
-          <button
-            className="game-btn"
-            tabIndex={0}
-            onClick={handlePause}
-            disabled={gamestate !== "running"}
-            aria-label="Pause"
-          >
-            Pause
-          </button>
-          <button
-            className="game-btn"
-            tabIndex={0}
-            onClick={() => handleRestart(false, { restartAtCurrentLevel: true })}
-            aria-label="Restart Game"
-          >
-            Restart
-          </button>
+          {/* Show appropriate action button(s) depending on game state */}
+          {/* While overlay is up (level complete or failed), only show relevant action button */}
+          {showLevelCompleted && !showLevelFailed && (
+            <button
+              className="game-btn"
+              tabIndex={0}
+              autoFocus
+              aria-label="Advance to Next Level"
+              onClick={() => {
+                setShowLevelCompleted(false);
+                setShowLevelFailed(false);
+                setLevel(lvl => lvl + 1);
+              }}
+            >
+              Advance
+            </button>
+          )}
+          {showLevelFailed && !showLevelCompleted && (
+            <button
+              className="game-btn"
+              tabIndex={0}
+              autoFocus
+              aria-label="Restart Level"
+              onClick={() => {
+                handleRestart(false, { restartAtCurrentLevel: true });
+                setShowLevelCompleted(false);
+                setShowLevelFailed(false);
+              }}
+            >
+              Restart
+            </button>
+          )}
+          {/* In normal play, show core controls */}
+          {!showLevelCompleted && !showLevelFailed && (
+            <>
+              <button
+                className="game-btn"
+                tabIndex={0}
+                onClick={handleStart}
+                disabled={gamestate === "running"}
+                aria-label="Start Game"
+              >
+                {btnLbl}
+              </button>
+              <button
+                className="game-btn"
+                tabIndex={0}
+                onClick={handlePause}
+                disabled={gamestate !== "running"}
+                aria-label="Pause"
+              >
+                Pause
+              </button>
+              <button
+                className="game-btn"
+                tabIndex={0}
+                onClick={() => handleRestart(false, { restartAtCurrentLevel: true })}
+                aria-label="Restart Game"
+              >
+                Restart
+              </button>
+            </>
+          )}
         </div>
         <div style={{ marginTop: "1.1rem", color: "#888", fontSize: 14 }}>
           Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.
