@@ -51,6 +51,17 @@ const CLR_BOT_DARK = "#d13ce6";
 
 /* ---- Utility helpers ---- */
 
+// Gun SFX: placeholder, customize as needed
+const SHOOT_SFX = "https://cdn.pixabay.com/audio/2022/11/16/audio_12b05e9424.mp3";
+const HIT_SFX = "https://cdn.pixabay.com/audio/2022/02/15/audio_115b6fbe3b.mp3";
+const ENEMY_DEFEAT_SFX = "https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa8c79.mp3";
+
+// Compute a direction vector (normalized)
+function dirVec(dx, dy) {
+  let mag = Math.sqrt(dx * dx + dy * dy);
+  if (!mag) return { x: 1, y: 0 };
+  return { x: dx / mag, y: dy / mag };
+}
 // PUBLIC_INTERFACE
 function playSound(eventType) {
   /**
@@ -121,10 +132,13 @@ function isCircleRectColliding(cx, cy, cr, ox, oy, ow, oh) {
   return dx*dx + dy*dy < cr*cr;
 }
 
-// PUBLIC_INTERFACE
+/* ---- Main Game State, including shooting/bullet/enemy HP additions ---- */
 function App() {
   // --- Core state
-  const [player, setPlayer] = useState({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
+  const [player, setPlayer] = useState({
+    x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0, isJumping: false,
+    jumpPhase: 0, facing: 1, isShooting: false, shootAnim: 0, canShoot: true
+  });
   const [bots, setBots] = useState([]);
   const [flag, setFlag] = useState({ x: 0, y: 0, heldBy: null, home: true });
   const [dropBox, setDropBox] = useState(null);
@@ -136,13 +150,19 @@ function App() {
   const [gamestate, setGamestate] = useState("ready"); // "ready" "running" "paused" "over"
   const [winner, setWinner] = useState(null);
   const [message, setMessage] = useState("");
-  // New: for explicit level/fail overlay control
   const [showLevelCompleted, setShowLevelCompleted] = useState(false);
   const [showLevelFailed, setShowLevelFailed] = useState(false);
+
+  // Shooting mechanic state
+  const [bullets, setBullets] = useState([]);
+  // Track enemy HP: map bot.id to { hp: 3, hitAnim: 0 }
+  const [enemyHp, setEnemyHp] = useState({});
 
   // --- Controls, Refs
   const canvasRef = useRef(null);
   const keyState = useRef({});
+  const mouseState = useRef({ mouseAngle: 0, mousePos: null }); // For extensibility (future enhancements: aim at mouse)
+  const shootCooldown = useRef(false);
 
   // --- Derived counts
   const numBots = BASE_NUM_BOTS + Math.floor((level - 1) / 2);
@@ -153,37 +173,39 @@ function App() {
     // Place flag in random area not in drop box/obstacle/player start
     const newFlag = { ...randomPos(CANVAS_W, CANVAS_H, 30), heldBy: null, home: true };
     setFlag(newFlag);
-    // Player at left
-    setPlayer({ x: 60, y: CANVAS_H/2, dx: 0, dy: 0, score: 0 })
-    // AI bots: staggered at right
+    // Player at left, reset shooting/jump state
+    setPlayer({
+      x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0, isJumping: false,
+      jumpPhase: 0, facing: 1, isShooting: false, shootAnim: 0, canShoot: true
+    });
+    // AI bots: staggered at right, new HP
     const botsArr = Array.from({ length: numBots }, (_, i) => ({
       id: i + 1,
-      x: CANVAS_W - 40 - (i*33),
-      y: 1.4*CANVAS_H/3 + (i*27),
-      dx: 0,
-      dy: 0,
-      score: 0,
-      // botParams for unique behavior
-      params: { 
+      x: CANVAS_W - 40 - (i * 33),
+      y: 1.4 * CANVAS_H / 3 + (i * 27),
+      dx: 0, dy: 0, score: 0,
+      params: {
         offset: (i * Math.PI) / numBots,
         swing: 18 + Math.random() * 11,
-        pursuitBias: 0.4 + 0.3 * (i / Math.max(numBots-1,1)),
-      }
+        pursuitBias: 0.4 + 0.3 * (i / Math.max(numBots - 1, 1)),
+      },
+      isJumping: false, jumpPhase: 0
     }));
     setBots(botsArr);
 
-    // Drop box: disabled until player picks flag
-    setDropBox(null);
+    // Set HP for each bot (3 for each)
+    let newHp = {};
+    for (let b of botsArr) newHp[b.id] = { hp: 3, hitAnim: 0 };
+    setEnemyHp(newHp);
 
-    // Random obstacles
+    setDropBox(null);
     const obsList = [];
     let added = 0, tryCount = 0;
     while (added < numObstacles && tryCount < 50) {
       const obs = randomObstacleRect(CANVAS_W, CANVAS_H);
-      // Avoid overlap with player start, bots, flag
       let overlaps = false;
-      if (dist(obs.x, obs.y, 60, CANVAS_H/2) < 75 || 
-          dist(obs.x+obs.w, obs.y+obs.h, 60, CANVAS_H/2) < 68)
+      if (dist(obs.x, obs.y, 60, CANVAS_H / 2) < 75 ||
+        dist(obs.x + obs.w, obs.y + obs.h, 60, CANVAS_H / 2) < 68)
         overlaps = true;
       if (!overlaps && dist(obs.x, obs.y, newFlag.x, newFlag.y) < 55)
         overlaps = true;
@@ -194,8 +216,7 @@ function App() {
       tryCount++;
     }
     setObstacles(obsList);
-
-    // Score, timer
+    setBullets([]);
     setTimer(SESSION_TIME);
     setMessage("");
     setWinner(null);
@@ -203,8 +224,6 @@ function App() {
     setRunning(false);
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
-
-  // We want to reset on level change (including initial mount)
   // eslint-disable-next-line
   }, [level]);
 
@@ -225,13 +244,23 @@ function App() {
 
   // --- Keyboard controls: listen while component active
   useEffect(() => {
+    // --- Key/mouse controls: movement, jump/attack (space), shoot (J, K, mouse LMB)
     function handleDown(e) {
+      // Movement
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
       if (e.key === "p" || e.key === "P") { if(running) handlePause(); }
-      // Removed: 'R' key handling for restart/continue by keyboard, now handled by buttons for level overlays
+      // JUMP (space)
+      if ((e.key === " " || e.key === "Spacebar") && !player.isJumping && running) {
+        setPlayer(pl => ({ ...pl, isJumping: true, jumpPhase: 0 }));
+        playSound("click");
+      }
+      // SHOOT (J or K or Z, future: mouse)
+      if (["j","J","k","K","z","Z"].includes(e.key)) {
+        shootBullet();
+      }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -239,26 +268,29 @@ function App() {
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = false;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = false;
     }
+    function handleMouseDown(e) {
+      if (e.button === 0 && running) {
+        shootBullet();
+      }
+    }
     window.addEventListener("keydown", handleDown);
     window.addEventListener("keyup", handleUp);
+    window.addEventListener("mousedown", handleMouseDown);
     return () => {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
+      window.removeEventListener("mousedown", handleMouseDown);
     };
-    // only once on mount
-    // eslint-disable-next-line
-  }, []);
-
-  // --- Game logic loop (player/bots/flag/obstacles/collisions/progress)
+  // eslint-disable-next-line
+  }, [player.isJumping, running, player.canShoot]);
+  // --- Game logic loop (player/bots/flag/obstacles/collisions/progress/bullets/jump/attack) ---
   useEffect(() => {
     let anim;
     let prevTimestamp = performance.now();
 
     function isMoveAllowed(nx, ny, rad, obsList) {
-      // test against all obstacles
       for (let o of obsList) if (isCircleRectColliding(nx, ny, rad, o.x, o.y, o.w, o.h)) return false;
-      // always inside field
-      if (nx < rad || ny < rad || nx > CANVAS_W-rad || ny > CANVAS_H-rad) return false;
+      if (nx < rad || ny < rad || nx > CANVAS_W - rad || ny > CANVAS_H - rad) return false;
       return true;
     }
 
@@ -267,7 +299,7 @@ function App() {
       const delta = timestamp - prevTimestamp;
       prevTimestamp = timestamp;
 
-      // --- Player move (+ obstacle collision)
+      // --- Handle Player Movement ---
       let [px, py] = [player.x, player.y];
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
@@ -275,98 +307,170 @@ function App() {
       if (keyState.current.left) pvx -= PLAYER_SPEED;
       if (keyState.current.right) pvx += PLAYER_SPEED;
       if (pvx !== 0 || pvy !== 0) {
-        const nm = Math.sqrt(pvx*pvx + pvy*pvy) || 1;
+        const nm = Math.sqrt(pvx * pvx + pvy * pvy) || 1;
         pvx = (pvx / nm) * PLAYER_SPEED;
         pvy = (pvy / nm) * PLAYER_SPEED;
       }
-      // Try new position, if not blocked by obstacles
-      if (isMoveAllowed(px + pvx, py + pvy, PLAYER_SIZE/2, obstacles)) {
-        px = clamp(px + pvx, PLAYER_SIZE/2, CANVAS_W-PLAYER_SIZE/2);
-        py = clamp(py + pvy, PLAYER_SIZE/2, CANVAS_H-PLAYER_SIZE/2);
+      // Flip player facing
+      let lastFace = player.facing;
+      if (pvx > 0) lastFace = 1;
+      if (pvx < 0) lastFace = -1;
+      // Try new position, if not blocked
+      if (isMoveAllowed(px + pvx, py + pvy, PLAYER_SIZE / 2, obstacles)) {
+        px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
+        py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
       }
       else {
-        // Try X or Y move only for easier sliding
-        if (isMoveAllowed(px + pvx, py, PLAYER_SIZE/2, obstacles)) px += pvx;
-        else if (isMoveAllowed(px, py + pvy, PLAYER_SIZE/2, obstacles)) py += pvy;
+        if (isMoveAllowed(px + pvx, py, PLAYER_SIZE / 2, obstacles)) px += pvx;
+        else if (isMoveAllowed(px, py + pvy, PLAYER_SIZE / 2, obstacles)) py += pvy;
       }
 
-      // ---- Bot AI: Always pursue the player (no flag targeting) ----
+      // --- Jump Animation Progress ---
+      let plJumpPhase = player.jumpPhase, plIsJump = player.isJumping;
+      if (plIsJump) {
+        plJumpPhase += 0.14 * (delta / 16.7); // speed up or slow down as appropriate
+        // When jump completes, reset
+        if (plJumpPhase > Math.PI) {
+          plIsJump = false;
+          plJumpPhase = 0;
+        }
+      }
+
+      // --- Shooting Animation/Cooldown Progress ---
+      let plShootAnim = player.shootAnim;
+      let plIsShoot = player.isShooting;
+      let canShoot = player.canShoot;
+      if (plIsShoot) {
+        plShootAnim += Math.PI / 5;
+        if (plShootAnim > Math.PI) {
+          plIsShoot = false;
+          plShootAnim = 0;
+        }
+      }
+
+      // --- Bots AI & Jump Animation ---
       let botArr = bots.map((bot, i, allBots) => {
         let { params } = bot;
-        // Bots always target the player position for pursuit
         let tgtX = player.x;
         let tgtY = player.y;
-        // Unique AI: Each bot swings in different "sine" or alternate path to avoid clustering
-        // They bias towards acquisition, but with rotation based on their offset (using 'params')
-        let speed = BASE_BOT_SPEED + 0.09 * (level-1) + 0.12*(i);
-        let bias = params.pursuitBias + .33*(level-1)/MAX_LEVEL;
-        let angle = Math.atan2(tgtY-bot.y, tgtX-bot.x);
-        angle += Math.sin(performance.now()/900 + params.offset*3) * (0.08 + 0.03*i);
-        let swingDist = params.swing + 3.2*level;
-        // Try to avoid other bots: repulsion
-        let toAvoid = allBots.reduce((sum, ob) => ob!==bot && dist(bot.x,bot.y,ob.x,ob.y)<22 ? sum+Math.sign(bot.x-ob.x) : sum, 0);
-        if (toAvoid) angle += 0.11*toAvoid;
-        let wantX = bot.x + Math.cos(angle)*speed*bias + Math.cos(angle+1.5)*speed*(1-bias)*0.49 + toAvoid;
-        let wantY = bot.y + Math.sin(angle)*speed*bias + Math.sin(angle+1.7)*speed*(1-bias)*0.51 + toAvoid;
-        // Try to avoid obstacles
-        let ballRad = BOT_SIZE/2;
-        if (isMoveAllowed(wantX, wantY, ballRad, obstacles)) {
-          return { ...bot, x: clamp(wantX, ballRad, CANVAS_W-ballRad), y: clamp(wantY, ballRad, CANVAS_H-ballRad) }
-        } else if (isMoveAllowed(bot.x + speed, bot.y, ballRad, obstacles)) {
-          return { ...bot, x: clamp(bot.x + speed, ballRad, CANVAS_W-ballRad) }
-        } else if (isMoveAllowed(bot.x, bot.y + speed, ballRad, obstacles)) {
-          return { ...bot, y: clamp(bot.y + speed, ballRad, CANVAS_H-ballRad) }
+        let speed = BASE_BOT_SPEED + 0.09 * (level - 1) + 0.12 * (i);
+        let bias = params.pursuitBias + .33 * (level - 1) / MAX_LEVEL;
+        let angle = Math.atan2(tgtY - bot.y, tgtX - bot.x);
+        angle += Math.sin(performance.now()/900 + params.offset * 3) * (0.08 + 0.03 * i);
+        let swingDist = params.swing + 3.2 * level;
+        let toAvoid = allBots.reduce((sum, ob) => ob !== bot && dist(bot.x, bot.y, ob.x, ob.y) < 22 ? sum + Math.sign(bot.x - ob.x) : sum, 0);
+        if (toAvoid) angle += 0.11 * toAvoid;
+        let wantX = bot.x + Math.cos(angle) * speed * bias + Math.cos(angle + 1.5) * speed * (1 - bias) * 0.49 + toAvoid;
+        let wantY = bot.y + Math.sin(angle) * speed * bias + Math.sin(angle + 1.7) * speed * (1 - bias) * 0.51 + toAvoid;
+        let ballRad = BOT_SIZE / 2;
+        // Bots jump with a random chance (future: more intelligent)
+        let bIsJump = bot.isJumping, bJumpPhase = bot.jumpPhase;
+        if (!bIsJump && Math.random() < 0.018 && Math.abs(wantY - bot.y) > 4) bIsJump = true;
+        if (bIsJump) {
+          bJumpPhase += 0.10 * (delta / 16.7);
+          if (bJumpPhase > Math.PI) { bIsJump = false; bJumpPhase = 0; }
         }
-        return { ...bot };
+        // Move as usual
+        if (isMoveAllowed(wantX, wantY, ballRad, obstacles)) {
+          return { ...bot, x: clamp(wantX, ballRad, CANVAS_W - ballRad), y: clamp(wantY, ballRad, CANVAS_H - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
+        } else if (isMoveAllowed(bot.x + speed, bot.y, ballRad, obstacles)) {
+          return { ...bot, x: clamp(bot.x + speed, ballRad, CANVAS_W - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
+        } else if (isMoveAllowed(bot.x, bot.y + speed, ballRad, obstacles)) {
+          return { ...bot, y: clamp(bot.y + speed, ballRad, CANVAS_H - ballRad), isJumping: bIsJump, jumpPhase: bJumpPhase }
+        }
+        return { ...bot, isJumping: bIsJump, jumpPhase: bJumpPhase };
       });
 
-      // ---- Check for collisions/captures ----
-      let newFlag = { ...flag };
+      // --- Bullets: move, animate, handle collisions with bots ---
+      let newBullets = [];
+      let newEnemyHp = { ...enemyHp };
+      let anyBotHit = false;
+      let hpDelta = false;
+      let botsToDefeat = new Set();
 
-      // Player can pick up flag if close and flag not held
-      if (!flag.heldBy && dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE)/2 + 2) {
+      for (let bullet of bullets) {
+        // Move bullet along vx, vy
+        let bx = bullet.x + bullet.vx, by = bullet.y + bullet.vy;
+        // Out of range? (max 520px from fire origin)
+        let traveled = dist(bullet.origin.x, bullet.origin.y, bx, by);
+        let dead = false;
+        if (bx < 0 || by < 0 || bx > CANVAS_W || by > CANVAS_H || traveled > 520) dead = true;
+        // Check collision with bots if bullet still alive
+        let hitBotIdx = -1;
+        bots.forEach((b, i) => {
+          if (dist(b.x, b.y, bx, by) < BOT_SIZE/2 + 8 && !dead && (newEnemyHp[b.id]?.hp > 0)) {
+            hitBotIdx = i;
+            anyBotHit = true;
+          }
+        });
+        if (hitBotIdx !== -1) {
+          let bot = bots[hitBotIdx];
+          let hpEnt = newEnemyHp[bot.id] || { hp: 3, hitAnim: 0 };
+          hpEnt.hp -= 1; // lose HP
+          hpEnt.hitAnim = 1.0; // flash animation
+          newEnemyHp[bot.id] = hpEnt;
+          // If HP drops to 0, mark bot for defeat
+          if (hpEnt.hp <= 0) botsToDefeat.add(bot.id);
+          playSoundEffect(HIT_SFX, 0.18);
+          hpDelta = true;
+          continue; // Bullet is destroyed on hit
+        }
+        if (!dead) newBullets.push({ ...bullet, x: bx, y: by, age: bullet.age + 1 });
+      }
+
+      // --- Enemy defeat removal ---
+      let remainingBots = botArr.filter(b => !(botsToDefeat.has(b.id)));
+      if (botsToDefeat.size) {
+        playSoundEffect(ENEMY_DEFEAT_SFX, 0.21);
+        // Spark "defeat" animation? (future: add visual effect), currently just remove
+      }
+
+      // --- Enemy hit animation timer decay ---
+      for (let k in newEnemyHp) {
+        if (newEnemyHp[k].hitAnim > 0) {
+          newEnemyHp[k] = { ...newEnemyHp[k], hitAnim: Math.max(0, newEnemyHp[k].hitAnim - 0.12) };
+        }
+      }
+
+      // --- Check player collision with flag, etc ---
+      let newFlag = { ...flag };
+      if (!flag.heldBy && dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2) {
         newFlag.heldBy = "player";
         newFlag.home = false;
         setDropBox(randomDropBox(CANVAS_W, CANVAS_H, 58));
-        playSound("flag-pickup"); // SFX: Flag acquired
+        playSound("flag-pickup");
       }
 
-      // Bots catch player if close (game over)
+      // --- Bots catch player (game over) ---
       let botCaught = false;
-      botArr.forEach(b => {
-        if (dist(px, py, b.x, b.y) < (PLAYER_SIZE + BOT_SIZE)/2 - 2) {
-          botCaught = true;
-        }
-      });
+      for (let b of remainingBots) {
+        if (dist(px, py, b.x, b.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) botCaught = true;
+      }
 
-      // --- Drop box: scoring/level up ---
+      // --- Drop box/score completion ---
       let playerScored = false;
       if (flag.heldBy === "player" && dropBox && dist(px, py, dropBox.x, dropBox.y) < (PLAYER_SIZE + DROP_BOX_SIZE)/2 + 4) {
         playerScored = true;
       }
 
-      // ---- Score, Level up, or Game Over ----
-      let newPlayerScore = player.score, newLevel = level, newWin = null, endMsg = "";
+      // --- Level/game state ---
+      let newPlayerScore = player.score;
+      let newWin = null;
       if (playerScored) {
         newPlayerScore += 1;
         setShowLevelCompleted(true);
         setMessage(`Level ${level} Completed! Press R to retry or advance.`);
-        playSound("score"); // SFX: Player scores
+        playSound("score");
         if (level >= MAX_LEVEL) {
           setGamestate("over");
           setWinner("player");
           setShowLevelCompleted(false);
           setMessage("Congratulations! You beat all levels!");
-        } else {
-          // Wait for player to press R, don't auto-advance.
         }
         setDropBox(null);
-        // Pause timer/game on level success
         setRunning(false);
-        setGamestate("postlevel"); // New gamestate for overlay
-        // Do NOT auto-set-timer or auto-set-level; resume/restart drives it.
+        setGamestate("postlevel");
       }
-      // Game over from bot catch
       if (botCaught) {
         newWin = "bot";
         setGamestate("over");
@@ -375,29 +479,72 @@ function App() {
         setMessage("You Failed! Press R to retry this level.");
         setDropBox(null);
         setRunning(false);
-        setGamestate("failed"); // New gamestate for failure/retry
+        setGamestate("failed");
         playSound("fail");
       }
 
-      // Carry flag with player if holding
+      // Flag follows player if holding
       if (newFlag.heldBy === "player") {
-        newFlag.x = px;
-        newFlag.y = py;
+        newFlag.x = px; newFlag.y = py;
       }
 
-      // Update all state
-      setPlayer(p => ({...p, x: px, y: py, score: newPlayerScore}));
-      setBots(botArr);
+      // --- Apply state updates for animation/FX ---
+      setPlayer(p => ({
+        ...p, x: px, y: py, score: newPlayerScore,
+        facing: lastFace,
+        isJumping: plIsJump, jumpPhase: plJumpPhase,
+        isShooting: plIsShoot, shootAnim: plShootAnim
+      }));
+      setBots(remainingBots);
       setFlag(newFlag);
+      setBullets(newBullets);
+      setEnemyHp(newEnemyHp);
 
-      // Timing loop for next frame
+      // Re-frame game if not won/lost
       if (!newWin && !playerScored && gamestate === "running")
         anim = requestAnimationFrame(gameTick);
     }
     if (gamestate === "running") anim = requestAnimationFrame(gameTick);
     return () => { if (anim) cancelAnimationFrame(anim); };
-    // eslint-disable-next-line
-  }, [gamestate, running, player, bots, flag, dropBox, obstacles, level]);
+  // eslint-disable-next-line
+  }, [gamestate, running, player, bots, flag, dropBox, obstacles, level, bullets, enemyHp]);
+
+  // --- Bullet shooting API ---
+  // PUBLIC_INTERFACE
+  function shootBullet() {
+    // Gun cooldown (350ms)
+    if (!player.canShoot || !running) return;
+    let px = player.x, py = player.y;
+    // Facing: right or left, for extensibility could use mouse for aim
+    let dir = { x: player.facing, y: 0 };
+    // Future: aim via mouse angle in mouseState, for now just left/right
+    let vx = dir.x * 8.7, vy = dir.y * 8.7;
+    // Bullet spawns at gun tip
+    let gunTipX = px + dir.x * (PLAYER_SIZE/2 + 11), gunTipY = py - 8;
+    setBullets(bu => [...bu, {
+      x: gunTipX, y: gunTipY,
+      vx, vy,
+      origin: { x: px, y: py },
+      age: 0
+    }]);
+    setPlayer(pl => ({
+      ...pl, isShooting: true, shootAnim: 0, canShoot: false
+    }));
+    playSoundEffect(SHOOT_SFX, 0.19);
+    // Cooldown
+    shootCooldown.current = true;
+    setTimeout(() => {
+      shootCooldown.current = false;
+      setPlayer(pl => ({ ...pl, canShoot: true }));
+    }, 350);
+  }
+
+  // SFX: non-blocking
+  function playSoundEffect(url, volume = 0.18) {
+    if (typeof window !== "undefined") {
+      try { const a = new window.Audio(url); a.volume = volume; a.play(); } catch (e) { }
+    }
+  }
 
   // --- Rendering the canvas/game area
   useEffect(() => {
@@ -606,54 +753,84 @@ function App() {
 
     ctx.restore();
 
-    // --- PLAYER: Complex Cartoon-SciFi Robot Art with Running Animation ---
-    /*
-      - Builds player robot from layered shapes: multiple segments per limb (shoulder, upper/lower arm, hand), body plating, glowing wires.
-      - Limbs/arms animate ("run") when the player is moving; body tilts, feet alternate.
-      - Facial detail: cartoon helmet, glowing "scanner", stylized mouth.
-      - Friendly sci-fi polish (blue/teal/cyan).
-      - All dimensions are relative to body size so easy later asset upgrade.
-    */
+    // --- PLAYER: Cartoon-SciFi Robot, now with Jump, Gun/Attack Animation ---
     ctx.save();
     ctx.translate(player.x, player.y);
 
-    // "Running" animation phase for limbs, based on motion
-    let pxSpeed = Math.abs(player.dx ?? 0) + Math.abs(player.dy ?? 0);
-    let moving = (keyState.current.up||keyState.current.down||keyState.current.left||keyState.current.right) && gamestate==="running";
-    // time variable, different per robot for less synchronization
-    let t = performance.now()/430;
+    // --- JUMP: vertical offset for body/limbs ---
+    let jumpYOffset = player.isJumping
+      ? -Math.abs(Math.sin(player.jumpPhase)) * 22
+      : 0;
+
+    // --- SHADOW: Player shadow (soft oval) ---
+    ctx.save();
+    ctx.globalAlpha = player.isJumping
+      ? 0.21 + 0.15 * Math.abs(Math.cos(player.jumpPhase))
+      : 0.39;
+    let shadowWidth = player.isJumping
+      ? 15 + 7 * Math.cos(player.jumpPhase)
+      : 23;
+    ctx.beginPath();
+    ctx.ellipse(0, 32, shadowWidth, 7, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#1581ab29";
+    ctx.filter = "blur(1.5px)";
+    ctx.fill();
+    ctx.filter = "none";
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // --- Running/JUMPING phase for limbs/torso/face ---
+    let moving =
+      (keyState.current.up || keyState.current.down || keyState.current.left ||
+        keyState.current.right) && gamestate === "running";
+    let t = performance.now() / 430;
     let limbCycle = moving ? t * 3.6 : 0;
     let legSwing = moving ? Math.sin(limbCycle) * 18 : 0;
     let legKick = moving ? Math.cos(limbCycle) * 15 : 0;
     let armSwing = moving ? Math.cos(limbCycle) * 17 : 0;
     let bodyTilt = moving ? Math.sin(limbCycle) * 3 : 0;
-    // Dimmer glow if idle
+    // If jumping, tilt/arms more vertical
+    if (player.isJumping) {
+      bodyTilt -= Math.sin(player.jumpPhase) * 6;
+      armSwing += Math.sin(player.jumpPhase) * 7;
+    }
+
     let outerGlow = moving ? "#18eaff" : "#6cf9ea";
-
     ctx.rotate(bodyTilt * Math.PI / 180);
+    ctx.translate(0, jumpYOffset);
 
-    // --- LEGS: Segmented, metallic joints+glow, with knees/feet (left/right swapped by phase)
+    // --- LEGS/JUMP: bounce higher while jumping
     let legs = [
-      { x1: -7, y1: 15, kneeX: -8 + Math.sin(limbCycle) * 2, kneeY: 24 + Math.abs(Math.cos(limbCycle)) * 6, footX: -10, footY: 31 + Math.abs(Math.sin(limbCycle)) * 3, swing: legSwing * 0.8 },
-      { x1: +7, y1: 15, kneeX: +8 - Math.sin(limbCycle) * 2, kneeY: 24 + Math.abs(Math.cos(limbCycle+Math.PI)) * 6, footX: +10, footY: 31 + Math.abs(Math.sin(limbCycle+Math.PI)) * 3, swing: -legSwing * 0.7 }
+      {
+        x1: -7, y1: 15,
+        kneeX: -8 + Math.sin(limbCycle) * 2,
+        kneeY: 24 + Math.abs(Math.cos(limbCycle)) * 6,
+        footX: -10, footY: 31 + Math.abs(Math.sin(limbCycle)) * 3 + (jumpYOffset / 1.9),
+        swing: legSwing * 0.8
+      },
+      {
+        x1: +7, y1: 15,
+        kneeX: +8 - Math.sin(limbCycle) * 2,
+        kneeY: 24 + Math.abs(Math.cos(limbCycle + Math.PI)) * 6,
+        footX: +10, footY: 31 + Math.abs(Math.sin(limbCycle + Math.PI)) * 3 + (jumpYOffset / 1.9),
+        swing: -legSwing * 0.7
+      }
     ];
     legs.forEach((leg, i) => {
       ctx.save();
       ctx.lineCap = "round";
-      // Thigh
       ctx.beginPath();
       ctx.moveTo(leg.x1, leg.y1);
-      ctx.lineTo(leg.kneeX, leg.kneeY + leg.swing/6);
+      ctx.lineTo(leg.kneeX, leg.kneeY + leg.swing / 6);
       ctx.lineWidth = 5.3;
       ctx.strokeStyle = "#b8efff";
       ctx.shadowColor = "#9ff";
       ctx.shadowBlur = 6;
       ctx.stroke();
       ctx.shadowBlur = 0;
-      // Shin
       ctx.beginPath();
-      ctx.moveTo(leg.kneeX, leg.kneeY + leg.swing/6);
-      ctx.lineTo(leg.footX, leg.footY + leg.swing/3);
+      ctx.moveTo(leg.kneeX, leg.kneeY + leg.swing / 6);
+      ctx.lineTo(leg.footX, leg.footY + leg.swing / 3);
       ctx.lineWidth = 4.0;
       ctx.strokeStyle = "#1fc1ec";
       ctx.shadowColor = "#1cfaff";
@@ -662,12 +839,11 @@ function App() {
       ctx.shadowBlur = 0;
       // Joints
       ctx.beginPath();
-      ctx.arc(leg.kneeX, leg.kneeY + leg.swing/6, 2.6, 0, Math.PI*2);
+      ctx.arc(leg.kneeX, leg.kneeY + leg.swing / 6, 2.6, 0, Math.PI * 2);
       ctx.fillStyle = "#e6edfc";
       ctx.fill();
-      // Foot (rounded base)
       ctx.beginPath();
-      ctx.ellipse(leg.footX, leg.footY + leg.swing/3, 3.3, 2.2, 0, 0, Math.PI*2);
+      ctx.ellipse(leg.footX, leg.footY + leg.swing / 3, 3.3, 2.2, 0, 0, Math.PI * 2);
       ctx.fillStyle = "#fff";
       ctx.globalAlpha = 0.85;
       ctx.shadowColor = "#17f9ffbb";
@@ -678,33 +854,30 @@ function App() {
       ctx.restore();
     });
 
-    // --- TORSO: Layered metallic plating with accent glows
-    // Outer chestplate
+    // --- Torso ---
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(0, 5, 11, 14, 0, 0, Math.PI*2);
-    let torsoGrad = ctx.createLinearGradient(-16,6,12,26);
-    torsoGrad.addColorStop(0.08,"#80eeff");
-    torsoGrad.addColorStop(0.4,"#44bbec");
-    torsoGrad.addColorStop(0.6,"#c3edfd");
-    torsoGrad.addColorStop(0.96,"#70e6f9");
+    ctx.ellipse(0, 5, 11, 14, 0, 0, Math.PI * 2);
+    let torsoGrad = ctx.createLinearGradient(-16, 6, 12, 26);
+    torsoGrad.addColorStop(0.08, "#80eeff");
+    torsoGrad.addColorStop(0.4, "#44bbec");
+    torsoGrad.addColorStop(0.6, "#c3edfd");
+    torsoGrad.addColorStop(0.96, "#70e6f9");
     ctx.fillStyle = torsoGrad;
     ctx.shadowColor = outerGlow;
     ctx.shadowBlur = 12;
     ctx.fill();
     ctx.shadowBlur = 0;
-    // Plating lines (segment detail)
     ctx.lineWidth = 1.4;
     ctx.strokeStyle = "#a5feff77";
     ctx.beginPath();
-    ctx.ellipse(0,11,8,3,0,0,Math.PI*2);
+    ctx.ellipse(0, 11, 8, 3, 0, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.moveTo(-7, 0); ctx.lineTo(7, 0); // collar plate
-    ctx.stroke();
-    ctx.globalAlpha=1;
+    ctx.moveTo(-7, 0); ctx.lineTo(7, 0); ctx.stroke();
+    ctx.globalAlpha = 1;
     ctx.restore();
 
-    // Glowing wire detail (horizontal across torso)
+    // Glow wire accent
     ctx.save();
     ctx.globalAlpha = 0.52;
     ctx.beginPath();
@@ -715,109 +888,139 @@ function App() {
     ctx.shadowColor = "#fe0";
     ctx.shadowBlur = 2.5;
     ctx.stroke();
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    ctx.restore();
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
 
-    // --- ARMS: Segmented, animated metallic over flex wires
-    let arms = [
-      { x0: -10, y0: -2, shx: -17, shy: 6 + Math.sin(limbCycle)*7, hx: -21, hy: 20 + Math.sin(limbCycle)*8 }, // Left
-      { x0: 10, y0: -2, shx: 17, shy: 6 + Math.cos(limbCycle)*7, hx: 21, hy: 20 + Math.cos(limbCycle)*8 } // Right
-    ];
-    arms.forEach((arm, i) => {
+    // --- Arms: One equipped w/ gun and attack animation
+    // Arm[0]=left, Arm[1]=right (right is gun hand). Player.facing controls mirror
+    let flip = player.facing === -1 ? -1 : 1;
+
+    // GUN ARM: fire/flash when attacking
+    let shootAnim = player.shootAnim;
+    let gunArmRaised = player.isShooting && shootAnim < Math.PI * 0.73;
+    let muzzleFlash = player.isShooting && shootAnim > Math.PI * 0.1 && shootAnim < Math.PI * 0.63;
+
+    // Left (non-gun) arm
+    (() => {
+      let ax = -10 * flip, ay = -2, shx = -17 * flip, shy = 6 + Math.sin(limbCycle) * 7, hx = -21 * flip, hy = 20 + Math.sin(limbCycle) * 8;
       ctx.save();
+      ctx.scale(flip, 1);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(ax * flip, ay);
+      ctx.lineTo(shx * flip, shy);
+      ctx.lineWidth = 4.8;
+      ctx.strokeStyle = "#abdfff";
+      ctx.shadowColor = "#87e6ffc8"; ctx.shadowBlur = 5.2; ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(shx * flip, shy);
+      ctx.lineTo(hx * flip, hy);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = "#19eff2";
+      ctx.shadowColor = "#7ef8fd"; ctx.shadowBlur = 3; ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(shx * flip, shy, 2.2, 0, Math.PI * 2);
+      ctx.arc(hx * flip, hy, 2.1, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff"; ctx.globalAlpha = 0.93; ctx.shadowColor = "#c7fcff"; ctx.shadowBlur = 3; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.restore();
+      // Wire accent
+      ctx.save(); ctx.scale(flip, 1); ctx.globalAlpha = 0.46; ctx.beginPath();
+      ctx.moveTo(ax * flip, ay + 2); ctx.bezierCurveTo(shx * flip, shy + 3, shx * flip - 3 * flip, (hy + shy) / 2, hx * flip - 2 * flip, hy + 2);
+      ctx.lineWidth = 1.5; ctx.strokeStyle = "#2dfeff"; ctx.shadowColor = "#2afffa"; ctx.shadowBlur = 4; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+    })();
+
+    // Right (gun) arm: draws up when shooting, shows gun and muzzle
+    (() => {
+      let shootLift = gunArmRaised ? -24 : 0;
+      let bulletArmSwing = gunArmRaised ? -19 : Math.cos(limbCycle) * 17;
+      let gunX = 17 * flip, gunY = 6 + shootLift / 2;
+      let hx = 23 * flip, hy = shootLift + 14 + Math.sin(limbCycle)*8 * (gunArmRaised?0.1:1);
+      ctx.save();
+      ctx.scale(flip, 1);
       ctx.lineCap = "round";
       // Shoulder to elbow
       ctx.beginPath();
-      ctx.moveTo(arm.x0, arm.y0);
-      ctx.lineTo(arm.shx, arm.shy);
-      ctx.lineWidth = 4.8;
-      ctx.strokeStyle = "#abdfff";
-      ctx.shadowColor = "#87e6ffc8";
-      ctx.shadowBlur = 5.2;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.moveTo(10 * flip, -2 + jumpYOffset / 9);
+      ctx.lineTo(gunX, gunY);
+      ctx.lineWidth = 4.7;
+      ctx.strokeStyle = "#fcffba";
+      ctx.shadowColor = "#c7eeff"; ctx.shadowBlur = 5.1; ctx.stroke(); ctx.shadowBlur = 0;
       // Elbow to hand
       ctx.beginPath();
-      ctx.moveTo(arm.shx, arm.shy);
-      ctx.lineTo(arm.hx, arm.hy);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = i? "#26c9ed" : "#19eff2";
-      ctx.shadowColor = "#7ef8fd";
-      ctx.shadowBlur = 3;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      // Arm joint bulbs
+      ctx.moveTo(gunX, gunY);
+      ctx.lineTo(hx, hy);
+      ctx.lineWidth = 4.3;
+      ctx.strokeStyle = "#26c9ed";
+      ctx.shadowColor = "#7ef8fd"; ctx.shadowBlur = 3; ctx.stroke(); ctx.shadowBlur = 0;
+      // Arm joints
       ctx.beginPath();
-      ctx.arc(arm.shx, arm.shy, 2.2, 0, Math.PI*2);
-      ctx.arc(arm.hx, arm.hy, 2.1, 0, Math.PI*2);
-      ctx.fillStyle = "#fff";
-      ctx.globalAlpha = 0.93;
-      ctx.shadowColor = "#c7fcff";
-      ctx.shadowBlur = 3;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.shadowBlur = 0;
-      ctx.restore();
-      // Accent electric wire
+      ctx.arc(gunX, gunY, 2.2, 0, Math.PI * 2);
+      ctx.arc(hx, hy, 2.1, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff"; ctx.globalAlpha = 0.93; ctx.shadowColor = "#c7fcff"; ctx.shadowBlur = 3; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+      // Gun body (simple cartoon pistol, emits flashes with shot)
       ctx.save();
-      ctx.globalAlpha=0.46;
+      ctx.translate(hx, hy - 2);
+      ctx.rotate((gunArmRaised ? -0.11 : 0));
       ctx.beginPath();
-      ctx.moveTo(arm.x0, arm.y0+2);
-      ctx.bezierCurveTo(arm.shx, arm.shy+3, arm.shx-3, (arm.hy+arm.shy)/2, arm.hx-2, arm.hy+2);
-      ctx.lineWidth=1.5;
-      ctx.strokeStyle="#2dfeff";
-      ctx.shadowColor="#2afffa";
-      ctx.shadowBlur=4;
-      ctx.stroke();
-      ctx.shadowBlur=0;
-      ctx.globalAlpha=1;
+      ctx.rect(-2 * flip, -5, 12 * flip, 7);
+      ctx.fillStyle = "#555"; ctx.globalAlpha = 0.94; ctx.shadowColor = "#aee3fc99";
+      ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      // Accents on gun
+      ctx.beginPath();
+      ctx.rect(-2 * flip, -5, 12 * flip, 2);
+      ctx.fillStyle = "#95f9ff"; ctx.globalAlpha = 0.68; ctx.shadowBlur = 0; ctx.fill(); ctx.globalAlpha = 1;
+      // Muzzle flash effect if firing
+      if (muzzleFlash) {
+        ctx.save();
+        ctx.globalAlpha = 0.95;
+        ctx.beginPath();
+        ctx.ellipse(13 * flip, -2, 10, 5.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#fffecd";
+        ctx.shadowColor = "#f9ff47";
+        ctx.shadowBlur = 21;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
       ctx.restore();
-    });
+      ctx.restore();
 
-    // --- HEAD: Dome robot helmet with joints, cyber visor and face
+      // Wire accent
+      ctx.save();
+      ctx.scale(flip, 1);
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.moveTo(10 * flip, 0);
+      ctx.bezierCurveTo(18 * flip, 10, 14 * flip, 17, hx - 2 * flip, hy + 6.5);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#25feffa0";
+      ctx.shadowColor = "#2afffa";
+      ctx.shadowBlur = 3;
+      ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+    })();
+
+    // --- HEAD (unchanged) ---
     ctx.save();
-    // Helmet lower base (shadow/visor line)
     ctx.beginPath();
-    ctx.ellipse(0, -10, 11.6, 7.6, 0, Math.PI*0.11, Math.PI*0.89, false);
-    ctx.fillStyle = "#97e7ffbb";
-    ctx.globalAlpha = 0.5;
-    ctx.fill();
-    ctx.globalAlpha=1;
-
-    // Head/dome exterior with gradient
+    ctx.ellipse(0, -10, 11.6, 7.6, 0, Math.PI * 0.11, Math.PI * 0.89, false);
+    ctx.fillStyle = "#97e7ffbb"; ctx.globalAlpha = 0.5; ctx.fill(); ctx.globalAlpha = 1;
     ctx.beginPath();
-    ctx.arc(0, -12, 11, 0, Math.PI*2);
-    let gradHead = ctx.createRadialGradient(0,-12,2,0,-12,11);
+    ctx.arc(0, -12, 11, 0, Math.PI * 2);
+    let gradHead = ctx.createRadialGradient(0, -12, 2, 0, -12, 11);
     gradHead.addColorStop(0, "#f6fdfe");
     gradHead.addColorStop(0.55, "#46cbf9");
     gradHead.addColorStop(1, "#49b7fd");
     ctx.fillStyle = gradHead;
-    ctx.shadowColor = outerGlow;
-    ctx.shadowBlur = 13;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // Panel lines on head
+    ctx.shadowColor = outerGlow; ctx.shadowBlur = 13; ctx.fill(); ctx.shadowBlur = 0;
     ctx.beginPath();
     ctx.moveTo(0, -23); ctx.lineTo(0, -3);
-    ctx.moveTo(-6,-20); ctx.lineTo(-4, -6);
-    ctx.moveTo(6,-20); ctx.lineTo(4,-6);
-    ctx.strokeStyle="#c2eaff77"; ctx.lineWidth=1.05;
-    ctx.globalAlpha=0.4;
-    ctx.stroke();
-    ctx.globalAlpha=1;
-    // Glowing visor/scanner
+    ctx.moveTo(-6, -20); ctx.lineTo(-4, -6);
+    ctx.moveTo(6, -20); ctx.lineTo(4, -6);
+    ctx.strokeStyle = "#c2eaff77"; ctx.lineWidth = 1.05; ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1;
     ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, -13.7, 7.7, 2.6, 0,0,Math.PI*2);
+    ctx.beginPath(); ctx.ellipse(0, -13.7, 7.7, 2.6, 0, 0, Math.PI * 2);
     ctx.fillStyle = "#dffcfc";
-    ctx.shadowColor = "#46e7ff";
-    ctx.shadowBlur = 11;
-    ctx.globalAlpha=0.82;
-    ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.shadowBlur = 0;
-    ctx.restore();
+    ctx.shadowColor = "#46e7ff"; ctx.shadowBlur = 11;
+    ctx.globalAlpha = 0.82; ctx.fill(); ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.restore();
 
     // Eyes (cyan-glow, animated blink shimmer)
     let blink = Math.abs(Math.sin(t*1.5));
@@ -831,44 +1034,37 @@ function App() {
     ctx.globalAlpha=1-blink*0.33;
     ctx.fill(); ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
 
-    // Smiling mouth (cyber grid lines)
+    // Cyber mouth
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(0, -7.3, 2.9, 1.3, 0, Math.PI*0.18, Math.PI*0.78, false);
-    ctx.strokeStyle = "#26e9fa"; ctx.lineWidth=1.13; ctx.globalAlpha=0.75;
-    ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
-    // Accent lines for cyber cheek marks
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(-6,-7.3); ctx.lineTo(-3.9,-7.7);
-    ctx.moveTo(6,-7.3); ctx.lineTo(3.9,-7.7);
-    ctx.strokeStyle="#26c9ec55"; ctx.lineWidth=1;
-    ctx.globalAlpha=0.49; ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
+    ctx.ellipse(0, -7.3, 2.9, 1.3, 0, Math.PI * 0.18, Math.PI * 0.78, false);
+    ctx.strokeStyle = "#26e9fa"; ctx.lineWidth = 1.13; ctx.globalAlpha = 0.75; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
 
-    // End helmet
-    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-6, -7.3); ctx.lineTo(-3.9, -7.7);
+    ctx.moveTo(6, -7.3); ctx.lineTo(3.9, -7.7);
+    ctx.strokeStyle = "#26c9ec55"; ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.49; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
+
+    ctx.restore(); // end head
 
     // Outline
     ctx.save();
     ctx.globalAlpha = 0.55;
     ctx.beginPath();
-    ctx.ellipse(0, 5, 12, 15, 0, 0, Math.PI*2);
-    ctx.strokeStyle = "#1b90c7";
-    ctx.lineWidth = 2.3;
-    ctx.stroke();
+    ctx.ellipse(0, 5, 12, 15, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "#1b90c7"; ctx.lineWidth = 2.3; ctx.stroke();
     ctx.beginPath();
-    ctx.arc(0, -12, 11, 0, Math.PI*2);
-    ctx.strokeStyle = "#18efff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.globalAlpha=1;
-    ctx.restore();
+    ctx.arc(0, -12, 11, 0, Math.PI * 2);
+    ctx.strokeStyle = "#18efff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.globalAlpha = 1; ctx.restore();
 
-    // --- Name label
+    // Name
     ctx.font = "bold 15px Poppins, Arial";
     ctx.fillStyle = "#1976d2";
     ctx.textAlign = "center";
-    ctx.fillText("You", 0, -25);
+    ctx.fillText("You", 0, -25 + jumpYOffset);
 
     // Flag carried icon
     if (flag.heldBy === "player") {
@@ -877,11 +1073,30 @@ function App() {
       ctx.textAlign = "center";
       ctx.shadowColor = "#fff7";
       ctx.shadowBlur = 6;
-      ctx.fillText("🏳️", 0, -2);
+      ctx.fillText("🏳️", 0, -2 + jumpYOffset);
       ctx.shadowBlur = 0;
     }
-
     ctx.restore();
+
+    // --- Bullets (cartoon plasma): Animate as colored oval projectiles
+    if (bullets && bullets.length > 0) {
+      for (let bullet of bullets) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(bullet.x, bullet.y, 7.5, 3.1, 0, 0, Math.PI*2);
+        let colGrad = ctx.createLinearGradient(bullet.x-8, bullet.y, bullet.x+8, bullet.y);
+        colGrad.addColorStop(0, "#95e4ff"); // bright cyan
+        colGrad.addColorStop(1, "#fffecd");
+        ctx.fillStyle = colGrad;
+        ctx.globalAlpha = 0.81;
+        ctx.shadowColor = "#fffacd";
+        ctx.shadowBlur = 14;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+    }
 
     // --- ENEMY BOTS: Layered, evil robot with animated run cycle + details ---
     /*
@@ -890,146 +1105,180 @@ function App() {
       Animates similar running cycle; eyes and mouth pulse.
     */
     bots.forEach((bot, i) => {
+      if (!enemyHp[bot.id] || enemyHp[bot.id].hp <= 0) return; // Skip dead bots
       ctx.save();
       ctx.translate(bot.x, bot.y);
 
-      let phase = (performance.now()/450 + i*77.3) * (moving?1.0:0.8);
+      // ENEMY JUMP: bounce on attack/hit
+      let botYOffset = (bot.isJumping && bot.jumpPhase < Math.PI)
+        ? -Math.abs(Math.sin(bot.jumpPhase)) * 19
+        : 0;
+
+      // Shadow
+      ctx.save();
+      ctx.globalAlpha = bot.isJumping ? 0.22 + 0.14 * Math.abs(Math.cos(bot.jumpPhase)) : 0.37;
+      let botShadowWide = bot.isJumping ? 13 + 7 * Math.cos(bot.jumpPhase) : 18;
+      ctx.beginPath();
+      ctx.ellipse(0, 27, botShadowWide, 6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#7000ad29";
+      ctx.filter = "blur(1.2px)";
+      ctx.fill();
+      ctx.filter = "none";
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      let phase = (performance.now() / 450 + i * 77.3) * (moving ? 1.0 : 0.8);
       let aSwing = Math.cos(phase) * 17, lSwing = Math.sin(phase) * 16;
-      // "Running": alternate/phase out arms and legs like player
+      ctx.translate(0, botYOffset);
+
+      // HIT FLASH SPARK EFFECT
+      let hitAlpha = 0;
+      let hpObj = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
+      if (hpObj.hitAnim > 0.22) {
+        hitAlpha = Math.min(1, hpObj.hitAnim);
+        ctx.save();
+        ctx.globalAlpha = hitAlpha * 0.74;
+        ctx.beginPath();
+        ctx.arc(0, 1, 18 + 7 * Math.sin(phase), 0, Math.PI * 2);
+        ctx.strokeStyle = "#ffd44d";
+        ctx.lineWidth = 7;
+        ctx.shadowColor = "#ffd44d";
+        ctx.shadowBlur = 14;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        ctx.restore();
+      }
+
+      // --- Legs ---
       let legs = [
-        { x1: -8, y1: 16, kx: -13, ky: 27+lSwing*0.32, fx: -14, fy: 36+lSwing, swing:lSwing },
-        { x1: +8, y1: 16, kx: +13, ky: 27-lSwing*0.22, fx: +14, fy: 36-lSwing, swing:-lSwing }
+        { x1: -8, y1: 16, kx: -13, ky: 27 + lSwing * 0.32, fx: -14, fy: 36 + lSwing, swing: lSwing },
+        { x1: +8, y1: 16, kx: +13, ky: 27 - lSwing * 0.22, fx: +14, fy: 36 - lSwing, swing: -lSwing }
       ];
-      legs.forEach((leg, j)=>{
+      legs.forEach((leg, j) => {
         ctx.save();
         ctx.lineCap = "round";
-        // Thigh
         ctx.beginPath();
-        ctx.moveTo(leg.x1, leg.y1); ctx.lineTo(leg.kx, leg.ky-2);
-        ctx.lineWidth=5.2; ctx.strokeStyle="#de65ea";
-        ctx.shadowColor="#cf7ffabc"; ctx.shadowBlur=6;
-        ctx.stroke(); ctx.shadowBlur=0;
-        // Shin
+        ctx.moveTo(leg.x1, leg.y1); ctx.lineTo(leg.kx, leg.ky - 2);
+        ctx.lineWidth = 5.2; ctx.strokeStyle = "#de65ea";
+        ctx.shadowColor = "#cf7ffabc"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.moveTo(leg.kx, leg.ky-2); ctx.lineTo(leg.fx, leg.fy);
-        ctx.lineWidth=4.1; ctx.strokeStyle="#bd04be";
-        ctx.shadowColor="#a700f6"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0;
-        // Joints/feet
+        ctx.moveTo(leg.kx, leg.ky - 2); ctx.lineTo(leg.fx, leg.fy);
+        ctx.lineWidth = 4.1; ctx.strokeStyle = "#bd04be";
+        ctx.shadowColor = "#a700f6"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
         ctx.beginPath();
-        ctx.arc(leg.kx, leg.ky-2, 2.2, 0, Math.PI*2);
-        ctx.arc(leg.fx, leg.fy, 2.5, 0, Math.PI*2);
-        ctx.fillStyle="#fee6ed"; ctx.shadowColor="#f0a3ff"; ctx.shadowBlur=3; ctx.fill();
-        ctx.globalAlpha=0.8; ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+        ctx.arc(leg.kx, leg.ky - 2, 2.2, 0, Math.PI * 2);
+        ctx.arc(leg.fx, leg.fy, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = "#fee6ed"; ctx.shadowColor = "#f0a3ff"; ctx.shadowBlur = 3; ctx.fill();
+        ctx.globalAlpha = 0.8; ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
       });
 
-      // Torso: angular, segmented plating, evil purple glow, sci-fi magenta
+      // Torso
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(-10,1); ctx.lineTo(0,20); ctx.lineTo(10,1); ctx.arc(0, 7, 13, Math.PI*0.071,Math.PI*0.94,false); ctx.closePath();
-      let bodGrad = ctx.createLinearGradient(-10,0,10,30);
-      bodGrad.addColorStop(0,"#7d02ba"); bodGrad.addColorStop(0.43,"#ff7bfa");
-      bodGrad.addColorStop(0.82,"#4e007a"); bodGrad.addColorStop(1,"#c14fd9");
+      ctx.moveTo(-10, 1); ctx.lineTo(0, 20); ctx.lineTo(10, 1); ctx.arc(0, 7, 13, Math.PI * 0.071, Math.PI * 0.94, false); ctx.closePath();
+      let bodGrad = ctx.createLinearGradient(-10, 0, 10, 30);
+      bodGrad.addColorStop(0, "#7d02ba"); bodGrad.addColorStop(0.43, "#ff7bfa");
+      bodGrad.addColorStop(0.82, "#4e007a"); bodGrad.addColorStop(1, "#c14fd9");
       ctx.fillStyle = bodGrad;
-      ctx.shadowColor = "#ff13fb";
-      ctx.shadowBlur = 14;
-      ctx.fill();
-      ctx.shadowBlur=0;
-      // Plating lines (evil accent)
-      ctx.globalAlpha = 0.53;
-      ctx.beginPath();
-      ctx.moveTo(-8,8); ctx.lineTo(8,12);
-      ctx.moveTo(-7,16); ctx.lineTo(7,8);
-      ctx.strokeStyle="#fffaff66"; ctx.lineWidth=1.35; ctx.stroke();
-      ctx.globalAlpha=1;
-      ctx.restore();
+      ctx.shadowColor = "#ff13fb"; ctx.shadowBlur = 14; ctx.fill(); ctx.shadowBlur = 0;
+      // Plating lines
+      ctx.globalAlpha = 0.53; ctx.beginPath(); ctx.moveTo(-8, 8); ctx.lineTo(8, 12);
+      ctx.moveTo(-7, 16); ctx.lineTo(7, 8); ctx.strokeStyle = "#fffaff66"; ctx.lineWidth = 1.35; ctx.stroke();
+      ctx.globalAlpha = 1; ctx.restore();
 
-      // Glowing/pulsing evil wires
+      // Glowing wire
       ctx.save();
-      ctx.globalAlpha=0.57;
-      ctx.beginPath();
-      ctx.moveTo(-7,17); ctx.bezierCurveTo(-4,15,1,29,+6,18+lSwing*0.08);
-      ctx.lineWidth=1.7; ctx.strokeStyle="#e44fff";
-      ctx.shadowColor="#f84fff"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+      ctx.globalAlpha = 0.57; ctx.beginPath();
+      ctx.moveTo(-7, 17); ctx.bezierCurveTo(-4, 15, 1, 29, +6, 18 + lSwing * 0.08);
+      ctx.lineWidth = 1.7; ctx.strokeStyle = "#e44fff"; ctx.shadowColor = "#f84fff"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
 
-      // Arms (animated, clawed, multi-segment)
+      // Arms
       let arms = [
-        { sx:-11, sy:2, ex:-22, ey:3+aSwing*0.53, hx:-26, hy:14+aSwing*0.66 },
-        { sx:11, sy:2, ex:22, ey:3-aSwing*0.57, hx:26, hy:14-aSwing*0.66 }
+        { sx: -11, sy: 2, ex: -22, ey: 3 + aSwing * 0.53, hx: -26, hy: 14 + aSwing * 0.66 },
+        { sx: 11, sy: 2, ex: 22, ey: 3 - aSwing * 0.57, hx: 26, hy: 14 - aSwing * 0.66 }
       ];
-      arms.forEach((arm,k)=>{
-        ctx.save(); ctx.lineCap="round";
-        ctx.beginPath(); ctx.moveTo(arm.sx,arm.sy); ctx.lineTo(arm.ex,arm.ey);
-        ctx.lineWidth=4.7; ctx.strokeStyle="#ffabe8"; ctx.shadowColor="#ffb3ee"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0;
+      arms.forEach((arm, k) => {
+        ctx.save(); ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(arm.sx, arm.sy); ctx.lineTo(arm.ex, arm.ey);
+        ctx.lineWidth = 4.7; ctx.strokeStyle = "#ffabe8"; ctx.shadowColor = "#ffb3ee"; ctx.shadowBlur = 6; ctx.stroke(); ctx.shadowBlur = 0;
         ctx.beginPath(); ctx.moveTo(arm.ex, arm.ey); ctx.lineTo(arm.hx, arm.hy);
-        ctx.lineWidth=3.6; ctx.strokeStyle="#bd04be"; ctx.shadowColor="#f7e8ff"; ctx.shadowBlur=4; ctx.stroke(); ctx.shadowBlur=0;
-        // Claw/joint
-        ctx.beginPath(); ctx.arc(arm.hx, arm.hy, 2.2, 0, Math.PI*2);
-        ctx.fillStyle = "#ffe8ff"; ctx.shadowColor = "#ff4efd"; ctx.shadowBlur=3; ctx.fill(); ctx.shadowBlur=0;
-        ctx.restore();
+        ctx.lineWidth = 3.6; ctx.strokeStyle = "#bd04be"; ctx.shadowColor = "#f7e8ff"; ctx.shadowBlur = 4; ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.beginPath(); ctx.arc(arm.hx, arm.hy, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffe8ff"; ctx.shadowColor = "#ff4efd"; ctx.shadowBlur = 3; ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
       });
 
-      // Head: angular, helmet + glowing jaw, with angry glowing evil eyes
+      // Head
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(-8,-12); ctx.lineTo(0,-23-Math.sin(phase)*2.7);
-      ctx.lineTo(8,-12); ctx.lineTo(3,-4); ctx.lineTo(-3,-4); ctx.closePath();
-      let grad = ctx.createRadialGradient(0,-17,1,0,-14,10);
-      grad.addColorStop(0,"#fff");
-      grad.addColorStop(0.18,"#ff7bfa");
-      grad.addColorStop(0.83,"#7d0155");
-      grad.addColorStop(1,"#770a20");
-      ctx.fillStyle=grad;
-      ctx.shadowColor="#ff12ed";
-      ctx.shadowBlur=12;
+      ctx.moveTo(-8, -12); ctx.lineTo(0, -23 - Math.sin(phase) * 2.7);
+      ctx.lineTo(8, -12); ctx.lineTo(3, -4); ctx.lineTo(-3, -4); ctx.closePath();
+      let grad = ctx.createRadialGradient(0, -17, 1, 0, -14, 10);
+      grad.addColorStop(0, "#fff");
+      grad.addColorStop(0.18, "#ff7bfa");
+      grad.addColorStop(0.83, "#7d0155");
+      grad.addColorStop(1, "#770a20");
+      ctx.fillStyle = grad; ctx.shadowColor = "#ff12ed"; ctx.shadowBlur = 12; ctx.fill(); ctx.shadowBlur = 0;
+      // Eyes
+      let eyeS = 2.3, pulse = (Math.sin(phase * 2.12) + 1.1) * 0.7;
+      ctx.save(); ctx.beginPath();
+      ctx.ellipse(-2.8, -15.8, eyeS, 2.6 - pulse, Math.PI * -.10, 0, Math.PI * 2);
+      ctx.ellipse(2.8, -15.8, eyeS, 2.6 - pulse, Math.PI * +.10, 0, Math.PI * 2);
+      ctx.fillStyle = "#fe3645";
+      ctx.shadowColor = "#ff1254"; ctx.shadowBlur = 14;
+      ctx.globalAlpha = 0.88 + 0.09 * Math.sin(phase); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+      // Jaw
+      ctx.save(); ctx.beginPath();
+      ctx.moveTo(-3, -7); ctx.lineTo(-1, -5 + 0.4 * pulse);
+      ctx.lineTo(1, -5 - 0.4 * pulse); ctx.lineTo(3, -7);
+      ctx.lineWidth = 1.18; ctx.strokeStyle = "#ff9eec"; ctx.globalAlpha = 0.85; ctx.stroke(); ctx.globalAlpha = 1; ctx.restore();
+
+      ctx.globalAlpha = 0.49;
+      ctx.beginPath();
+      ctx.moveTo(-4, -19); ctx.lineTo(4, -19);
+      ctx.moveTo(-1, -21); ctx.lineTo(-1, -13);
+      ctx.moveTo(1, -21); ctx.lineTo(1, -13);
+      ctx.strokeStyle = "#ffeafd49"; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.restore(); // end head
+
+      // --- ENEMY HP BAR (overhead) ---
+      let hp = hpObj.hp || 0;
+      let barW = 30, barH = 5, pad = 18 + botYOffset;
+      ctx.save();
+      ctx.globalAlpha = 0.92;
+      ctx.beginPath();
+      ctx.rect(-barW / 2, -pad - 6, barW, barH);
+      ctx.fillStyle = "#363";
       ctx.fill();
-      ctx.shadowBlur=0;
-      // Eyes: red arc, glowing, angry
-      let eyeS = 2.3, pulse = (Math.sin(phase*2.12)+1.1)*0.7;
-      ctx.save();
       ctx.beginPath();
-      ctx.ellipse(-2.8,-15.8,eyeS,2.6-pulse,Math.PI * -.10,0,Math.PI*2);
-      ctx.ellipse(2.8,-15.8,eyeS,2.6-pulse,Math.PI * +.10,0,Math.PI*2);
-      ctx.fillStyle="#fe3645";
-      ctx.shadowColor="#ff1254"; ctx.shadowBlur=14;
-      ctx.globalAlpha = 0.88+0.09*Math.sin(phase);
-      ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
-      // Angry robot mouth/jaw
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(-3,-7); ctx.lineTo(-1,-5+0.4*pulse);
-      ctx.lineTo(1,-5-0.4*pulse); ctx.lineTo(3,-7);
-      ctx.lineWidth=1.18; ctx.strokeStyle="#ff9eec"; ctx.globalAlpha=0.85; ctx.stroke(); ctx.globalAlpha=1;
+      ctx.rect(-barW / 2, -pad - 6, barW * (hp / 3), barH);
+      ctx.fillStyle = hp === 1 ? "#ff6226" : (hp === 2 ? "#ffd44d" : "#9bff4a");
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "#fff";
+      ctx.stroke();
       ctx.restore();
 
-      // Helmet panel lines
-      ctx.globalAlpha=0.49;
-      ctx.beginPath();
-      ctx.moveTo(-4,-19); ctx.lineTo(4,-19);
-      ctx.moveTo(-1,-21); ctx.lineTo(-1,-13);
-      ctx.moveTo(1,-21); ctx.lineTo(1,-13);
-      ctx.strokeStyle="#ffeafd49"; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
-      ctx.restore();
+      // --- ENEMY "SPARKS/DEFEAT": If hit ---
+      if (hpObj.hitAnim > 0.21) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, hpObj.hitAnim / 1.2));
+        ctx.beginPath();
+        ctx.arc(0, -barW / 2, 15 + 9 * Math.sin(phase), 0, Math.PI * 2);
+        ctx.strokeStyle = "#ffd44d";
+        ctx.lineWidth = 3.2;
+        ctx.shadowColor = "#ffd44d";
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1; ctx.restore();
+      }
 
-      // Outline for clarity
-      ctx.globalAlpha=0.47;
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(-10,1); ctx.lineTo(0,20); ctx.lineTo(10,1);
-      ctx.arc(0, 7, 13, Math.PI*0.071,Math.PI*0.94,false);
-      ctx.closePath();
-      ctx.strokeStyle="#8b078a"; ctx.lineWidth=2.2; ctx.stroke();
-      ctx.restore();
-      ctx.globalAlpha=1;
-
-      // Bot ID
+      // Bot label
       ctx.font = "bold 12px Poppins, Arial";
       ctx.fillStyle = "#bb35f3";
       ctx.textAlign = "center";
-      ctx.fillText(`Bot${i + 1}`, 0, -25);
+      ctx.fillText(`Bot${i + 1}`, 0, -25 + botYOffset);
 
       ctx.restore();
-
-      // NOTE: Asset hook -- to upgrade with sprite/illustration, replace above drawing with drawImage
     });
 
     // End overlay

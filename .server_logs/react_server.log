@@ -6,39 +6,22 @@ Attempting to bind to HOST environment variable: 0.0.0.0
 If this was unintentional, check that you haven't mistakenly set it in your shell.
 Learn more here: https://cra.link/advanced-config
 
-(node:3738) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:5329) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-(node:3738) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(node:5329) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
 Starting the development server...
 
-Compiled with warnings.
+Compiled successfully!
 
-[eslint] 
-src/App.js
-  Line 49:7:    'CLR_BOT' is assigned a value but never used        no-unused-vars
-  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used   no-unused-vars
-  Line 133:10:  'difficulty' is assigned a value but never used     no-unused-vars
-  Line 133:22:  'setDifficulty' is assigned a value but never used  no-unused-vars
-  Line 267:13:  'delta' is assigned a value but never used          no-unused-vars
-  Line 305:13:  'swingDist' is assigned a value but never used      no-unused-vars
-  Line 349:42:  'newLevel' is assigned a value but never used       no-unused-vars
-  Line 349:75:  'endMsg' is assigned a value but never used         no-unused-vars
+You can now view react-kavia in the browser.
 
-Search for the keywords to learn more about each warning.
-To ignore, add // eslint-disable-next-line to the line before.
+  Local:            http://localhost:3000
+  On Your Network:  http://172.17.0.2:3000
 
-WARNING in [eslint] 
-src/App.js
-  Line 49:7:    'CLR_BOT' is assigned a value but never used        no-unused-vars
-  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used   no-unused-vars
-  Line 133:10:  'difficulty' is assigned a value but never used     no-unused-vars
-  Line 133:22:  'setDifficulty' is assigned a value but never used  no-unused-vars
-  Line 267:13:  'delta' is assigned a value but never used          no-unused-vars
-  Line 305:13:  'swingDist' is assigned a value but never used      no-unused-vars
-  Line 349:42:  'newLevel' is assigned a value but never used       no-unused-vars
-  Line 349:75:  'endMsg' is assigned a value but never used         no-unused-vars
+Note that the development build is not optimized.
+To create a production build, use npm run build.
 
-webpack compiled with 1 warning
+webpack compiled successfully
 Compiling...
 Compiled with warnings.
 
@@ -72,5 +55,301 @@ src/App.js
   Line 621:9:   'pxSpeed' is assigned a value but never used        no-unused-vars
   Line 627:9:   'legKick' is assigned a value but never used        no-unused-vars
   Line 628:9:   'armSwing' is assigned a value but never used       no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used           no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used      no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used         no-unused-vars
+  Line 56:7:    'HIT_SFX' is assigned a value but never used           no-unused-vars
+  Line 57:7:    'ENEMY_DEFEAT_SFX' is assigned a value but never used  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                     no-unused-vars
+  Line 144:10:  'difficulty' is assigned a value but never used        no-unused-vars
+  Line 144:22:  'setDifficulty' is assigned a value but never used     no-unused-vars
+  Line 278:13:  'delta' is assigned a value but never used             no-unused-vars
+  Line 316:13:  'swingDist' is assigned a value but never used         no-unused-vars
+  Line 360:42:  'newLevel' is assigned a value but never used          no-unused-vars
+  Line 360:75:  'endMsg' is assigned a value but never used            no-unused-vars
+  Line 632:9:   'pxSpeed' is assigned a value but never used           no-unused-vars
+  Line 638:9:   'legKick' is assigned a value but never used           no-unused-vars
+  Line 639:9:   'armSwing' is assigned a value but never used          no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used           no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used      no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used         no-unused-vars
+  Line 56:7:    'HIT_SFX' is assigned a value but never used           no-unused-vars
+  Line 57:7:    'ENEMY_DEFEAT_SFX' is assigned a value but never used  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                     no-unused-vars
+  Line 144:10:  'difficulty' is assigned a value but never used        no-unused-vars
+  Line 144:22:  'setDifficulty' is assigned a value but never used     no-unused-vars
+  Line 278:13:  'delta' is assigned a value but never used             no-unused-vars
+  Line 316:13:  'swingDist' is assigned a value but never used         no-unused-vars
+  Line 360:42:  'newLevel' is assigned a value but never used          no-unused-vars
+  Line 360:75:  'endMsg' is assigned a value but never used            no-unused-vars
+  Line 632:9:   'pxSpeed' is assigned a value but never used           no-unused-vars
+  Line 638:9:   'legKick' is assigned a value but never used           no-unused-vars
+  Line 639:9:   'armSwing' is assigned a value but never used          no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used           no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used      no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used         no-unused-vars
+  Line 56:7:    'HIT_SFX' is assigned a value but never used           no-unused-vars
+  Line 57:7:    'ENEMY_DEFEAT_SFX' is assigned a value but never used  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                     no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used        no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used     no-unused-vars
+  Line 157:10:  'bullets' is assigned a value but never used           no-unused-vars
+  Line 159:10:  'enemyHp' is assigned a value but never used           no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used        no-unused-vars
+  Line 165:9:   'shootCooldown' is assigned a value but never used     no-unused-vars
+  Line 286:13:  'delta' is assigned a value but never used             no-unused-vars
+  Line 324:13:  'swingDist' is assigned a value but never used         no-unused-vars
+  Line 368:42:  'newLevel' is assigned a value but never used          no-unused-vars
+  Line 368:75:  'endMsg' is assigned a value but never used            no-unused-vars
+  Line 640:9:   'pxSpeed' is assigned a value but never used           no-unused-vars
+  Line 646:9:   'legKick' is assigned a value but never used           no-unused-vars
+  Line 647:9:   'armSwing' is assigned a value but never used          no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used           no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used      no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used         no-unused-vars
+  Line 56:7:    'HIT_SFX' is assigned a value but never used           no-unused-vars
+  Line 57:7:    'ENEMY_DEFEAT_SFX' is assigned a value but never used  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                     no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used        no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used     no-unused-vars
+  Line 157:10:  'bullets' is assigned a value but never used           no-unused-vars
+  Line 159:10:  'enemyHp' is assigned a value but never used           no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used        no-unused-vars
+  Line 165:9:   'shootCooldown' is assigned a value but never used     no-unused-vars
+  Line 286:13:  'delta' is assigned a value but never used             no-unused-vars
+  Line 324:13:  'swingDist' is assigned a value but never used         no-unused-vars
+  Line 368:42:  'newLevel' is assigned a value but never used          no-unused-vars
+  Line 368:75:  'endMsg' is assigned a value but never used            no-unused-vars
+  Line 640:9:   'pxSpeed' is assigned a value but never used           no-unused-vars
+  Line 646:9:   'legKick' is assigned a value but never used           no-unused-vars
+  Line 647:9:   'armSwing' is assigned a value but never used          no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Failed to compile.
+
+[eslint] 
+src/App.js
+  Line 262:9:  'shootBullet' is not defined  no-undef
+  Line 273:9:  'shootBullet' is not defined  no-undef
+
+Search for the keywords to learn more about each error.
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used           no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used      no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used         no-unused-vars
+  Line 56:7:    'HIT_SFX' is assigned a value but never used           no-unused-vars
+  Line 57:7:    'ENEMY_DEFEAT_SFX' is assigned a value but never used  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                     no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used        no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used     no-unused-vars
+  Line 157:10:  'bullets' is assigned a value but never used           no-unused-vars
+  Line 159:10:  'enemyHp' is assigned a value but never used           no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used        no-unused-vars
+  Line 165:9:   'shootCooldown' is assigned a value but never used     no-unused-vars
+  Line 302:13:  'delta' is assigned a value but never used             no-unused-vars
+  Line 340:13:  'swingDist' is assigned a value but never used         no-unused-vars
+  Line 384:42:  'newLevel' is assigned a value but never used          no-unused-vars
+  Line 384:75:  'endMsg' is assigned a value but never used            no-unused-vars
+  Line 656:9:   'pxSpeed' is assigned a value but never used           no-unused-vars
+  Line 662:9:   'legKick' is assigned a value but never used           no-unused-vars
+  Line 663:9:   'armSwing' is assigned a value but never used          no-unused-vars
+
+ERROR in [eslint] 
+src/App.js
+  Line 262:9:  'shootBullet' is not defined  no-undef
+  Line 273:9:  'shootBullet' is not defined  no-undef
+
+Search for the keywords to learn more about each error.
+
+webpack compiled with 1 error and 1 warning
+Compiling...
+Failed to compile.
+
+[eslint] 
+src/App.js
+  Line 262:9:   'shootBullet' is not defined      no-undef
+  Line 273:9:   'shootBullet' is not defined      no-undef
+  Line 414:11:  'playSoundEffect' is not defined  no-undef
+  Line 424:9:   'playSoundEffect' is not defined  no-undef
+
+Search for the keywords to learn more about each error.
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 55:7:    'SHOOT_SFX' is assigned a value but never used                                     no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 165:9:   'shootCooldown' is assigned a value but never used                                 no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 731:9:   'pxSpeed' is assigned a value but never used                                       no-unused-vars
+  Line 737:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 738:9:   'armSwing' is assigned a value but never used                                      no-unused-vars
+
+ERROR in [eslint] 
+src/App.js
+  Line 262:9:   'shootBullet' is not defined      no-undef
+  Line 273:9:   'shootBullet' is not defined      no-undef
+  Line 414:11:  'playSoundEffect' is not defined  no-undef
+  Line 424:9:   'playSoundEffect' is not defined  no-undef
+
+Search for the keywords to learn more about each error.
+
+webpack compiled with 1 error and 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 768:9:   'pxSpeed' is assigned a value but never used                                       no-unused-vars
+  Line 774:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 775:9:   'armSwing' is assigned a value but never used                                      no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 768:9:   'pxSpeed' is assigned a value but never used                                       no-unused-vars
+  Line 774:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 775:9:   'armSwing' is assigned a value but never used                                      no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 789:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 795:7:   'armSwing' is assigned a value but never used                                      no-unused-vars
+  Line 933:11:  'bulletArmSwing' is assigned a value but never used                                no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 789:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 795:7:   'armSwing' is assigned a value but never used                                      no-unused-vars
+  Line 933:11:  'bulletArmSwing' is assigned a value but never used                                no-unused-vars
+
+webpack compiled with 1 warning
+Compiling...
+Compiled with warnings.
+
+[eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 789:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 795:7:   'armSwing' is assigned a value but never used                                      no-unused-vars
+  Line 933:11:  'bulletArmSwing' is assigned a value but never used                                no-unused-vars
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in [eslint] 
+src/App.js
+  Line 49:7:    'CLR_BOT' is assigned a value but never used                                       no-unused-vars
+  Line 50:7:    'CLR_BOT_DARK' is assigned a value but never used                                  no-unused-vars
+  Line 60:10:   'dirVec' is defined but never used                                                 no-unused-vars
+  Line 147:10:  'difficulty' is assigned a value but never used                                    no-unused-vars
+  Line 147:22:  'setDifficulty' is assigned a value but never used                                 no-unused-vars
+  Line 164:9:   'mouseState' is assigned a value but never used                                    no-unused-vars
+  Line 342:11:  'canShoot' is assigned a value but never used                                      no-unused-vars
+  Line 360:13:  'swingDist' is assigned a value but never used                                     no-unused-vars
+  Line 387:11:  'anyBotHit' is assigned a value but never used                                     no-unused-vars
+  Line 400:22:  Function declared in a loop contains unsafe references to variable(s) 'anyBotHit'  no-loop-func
+  Line 415:11:  'hpDelta' is assigned a value but never used                                       no-unused-vars
+  Line 789:9:   'legKick' is assigned a value but never used                                       no-unused-vars
+  Line 795:7:   'armSwing' is assigned a value but never used                                      no-unused-vars
+  Line 933:11:  'bulletArmSwing' is assigned a value but never used                                no-unused-vars
 
 webpack compiled with 1 warning
