@@ -216,12 +216,20 @@ function App() {
       // --- PRESS X TO START THE GAME (when showXToPlay is true) ---
       if (showXToPlay && (e.key === "x" || e.key === "X")) {
         setShowXToPlay(false);
+        // Ensure overlays gone, input enabled, gameplay resumes
+        setShowLevelCompleted(false);
+        setShowLevelFailed(false);
+        setWinner(null);
+        setMessage("");
+        keyState.current = {};
         handleStart();
         return;
       }
-      if (showXToPlay) return; // Block all game/gameplay controls
+      if (showXToPlay) return; // Block all input except X when overlay shown
 
-      // Movement keys (block while in menu overlay)
+      // --- All input below only enabled when overlay NOT visible ---
+
+      // Movement keys
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
@@ -235,9 +243,15 @@ function App() {
         if (showLevelCompleted || showLevelFailed || gamestate === "failed" || gamestate === "postlevel") {
           robustRestart(false, { restartAtCurrentLevel: true });
           setShowXToPlay(true);
+          setGamestate("ready");
+          setRunning(false);
+          keyState.current = {};
         } else {
           robustRestart(false, { restartAtCurrentLevel: false });
           setShowXToPlay(true);
+          setGamestate("ready");
+          setRunning(false);
+          keyState.current = {};
         }
       }
     }
@@ -750,7 +764,11 @@ function App() {
                     setWinner(null);
                     setMessage("");
                     robustRestart(false, { restartAtCurrentLevel: true });
+                    // Show start overlay, set explicitly to XToPlay screen in 'ready' (paused) mode
                     setShowXToPlay(true);
+                    setGamestate("ready");
+                    setRunning(false);
+                    keyState.current = {};
                   }}
                 >
                   Continue
@@ -938,7 +956,12 @@ function App() {
                 setWinner(null);
                 setMessage("");
                 robustRestart(false, { restartAtCurrentLevel: true });
+                // Restore XToPlay overlay and reset gamestate to 'ready' (paused)
                 setShowXToPlay(true);
+                setGamestate("ready");
+                setRunning(false);
+                // Also ensure keyState is cleared (no sticky keys)
+                keyState.current = {};
               }}
             >
               Restart
@@ -965,6 +988,9 @@ function App() {
                   setShowXToPlay(true);
                   setWinner(null);
                   setMessage("");
+                  setGamestate("ready");
+                  setRunning(false);
+                  keyState.current = {};
                 }}
                 aria-label="Restart Game"
               >
