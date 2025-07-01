@@ -606,140 +606,269 @@ function App() {
 
     ctx.restore();
 
-    // --- Player: robot-human cartoon hybrid (robotlimbs, glowing eyes, friendly face)
+    // --- PLAYER: Complex Cartoon-SciFi Robot Art with Running Animation ---
     /*
-      PLAYER REDESIGN:
-      Friendly humanoid robot: round blue head, metal arms and legs, sci-fi torso, cyan-glow round eyes.
-      Placeholder only (swap with image/sprite for full polish).
+      - Builds player robot from layered shapes: multiple segments per limb (shoulder, upper/lower arm, hand), body plating, glowing wires.
+      - Limbs/arms animate ("run") when the player is moving; body tilts, feet alternate.
+      - Facial detail: cartoon helmet, glowing "scanner", stylized mouth.
+      - Friendly sci-fi polish (blue/teal/cyan).
+      - All dimensions are relative to body size so easy later asset upgrade.
     */
     ctx.save();
     ctx.translate(player.x, player.y);
 
-    // Torso/Body
+    // "Running" animation phase for limbs, based on motion
+    let pxSpeed = Math.abs(player.dx ?? 0) + Math.abs(player.dy ?? 0);
+    let moving = (keyState.current.up||keyState.current.down||keyState.current.left||keyState.current.right) && gamestate==="running";
+    // time variable, different per robot for less synchronization
+    let t = performance.now()/430;
+    let limbCycle = moving ? t * 3.6 : 0;
+    let legSwing = moving ? Math.sin(limbCycle) * 18 : 0;
+    let legKick = moving ? Math.cos(limbCycle) * 15 : 0;
+    let armSwing = moving ? Math.cos(limbCycle) * 17 : 0;
+    let bodyTilt = moving ? Math.sin(limbCycle) * 3 : 0;
+    // Dimmer glow if idle
+    let outerGlow = moving ? "#18eaff" : "#6cf9ea";
+
+    ctx.rotate(bodyTilt * Math.PI / 180);
+
+    // --- LEGS: Segmented, metallic joints+glow, with knees/feet (left/right swapped by phase)
+    let legs = [
+      { x1: -7, y1: 15, kneeX: -8 + Math.sin(limbCycle) * 2, kneeY: 24 + Math.abs(Math.cos(limbCycle)) * 6, footX: -10, footY: 31 + Math.abs(Math.sin(limbCycle)) * 3, swing: legSwing * 0.8 },
+      { x1: +7, y1: 15, kneeX: +8 - Math.sin(limbCycle) * 2, kneeY: 24 + Math.abs(Math.cos(limbCycle+Math.PI)) * 6, footX: +10, footY: 31 + Math.abs(Math.sin(limbCycle+Math.PI)) * 3, swing: -legSwing * 0.7 }
+    ];
+    legs.forEach((leg, i) => {
+      ctx.save();
+      ctx.lineCap = "round";
+      // Thigh
+      ctx.beginPath();
+      ctx.moveTo(leg.x1, leg.y1);
+      ctx.lineTo(leg.kneeX, leg.kneeY + leg.swing/6);
+      ctx.lineWidth = 5.3;
+      ctx.strokeStyle = "#b8efff";
+      ctx.shadowColor = "#9ff";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Shin
+      ctx.beginPath();
+      ctx.moveTo(leg.kneeX, leg.kneeY + leg.swing/6);
+      ctx.lineTo(leg.footX, leg.footY + leg.swing/3);
+      ctx.lineWidth = 4.0;
+      ctx.strokeStyle = "#1fc1ec";
+      ctx.shadowColor = "#1cfaff";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Joints
+      ctx.beginPath();
+      ctx.arc(leg.kneeX, leg.kneeY + leg.swing/6, 2.6, 0, Math.PI*2);
+      ctx.fillStyle = "#e6edfc";
+      ctx.fill();
+      // Foot (rounded base)
+      ctx.beginPath();
+      ctx.ellipse(leg.footX, leg.footY + leg.swing/3, 3.3, 2.2, 0, 0, Math.PI*2);
+      ctx.fillStyle = "#fff";
+      ctx.globalAlpha = 0.85;
+      ctx.shadowColor = "#17f9ffbb";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    });
+
+    // --- TORSO: Layered metallic plating with accent glows
+    // Outer chestplate
+    ctx.save();
     ctx.beginPath();
-    ctx.ellipse(0, 5, 10, 13, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#72eaff";
-    ctx.shadowColor = "#7fffd4";
-    ctx.shadowBlur = 6;
+    ctx.ellipse(0, 5, 11, 14, 0, 0, Math.PI*2);
+    let torsoGrad = ctx.createLinearGradient(-16,6,12,26);
+    torsoGrad.addColorStop(0.08,"#80eeff");
+    torsoGrad.addColorStop(0.4,"#44bbec");
+    torsoGrad.addColorStop(0.6,"#c3edfd");
+    torsoGrad.addColorStop(0.96,"#70e6f9");
+    ctx.fillStyle = torsoGrad;
+    ctx.shadowColor = outerGlow;
+    ctx.shadowBlur = 12;
     ctx.fill();
     ctx.shadowBlur = 0;
-
-    // Head
+    // Plating lines (segment detail)
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#a5feff77";
     ctx.beginPath();
-    ctx.arc(0, -10, 9.1, 0, Math.PI * 2);
-    ctx.fillStyle = "#46cbf9";
-    ctx.shadowColor = "#12fbff88";
-    ctx.shadowBlur = 5;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Glowing cyan eyes (cartoon, friendly, humanoid)
-    ctx.beginPath();
-    ctx.arc(-3.4, -12.3, 2.1, 0, Math.PI * 2);
-    ctx.arc(3.4, -12.3, 2.1, 0, Math.PI * 2);
-    ctx.fillStyle = "#f4feff";
-    ctx.shadowColor = "#87f0f9cc";
-    ctx.shadowBlur = 7;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Mouth (smile, friendly)
-    ctx.beginPath();
-    ctx.arc(0, -7.7, 2.6, Math.PI * 0.16, Math.PI * 0.81, false);
-    ctx.lineWidth = 1.15;
-    ctx.strokeStyle = "#24d7fa";
-    ctx.globalAlpha = 0.65;
+    ctx.ellipse(0,11,8,3,0,0,Math.PI*2);
     ctx.stroke();
+    ctx.moveTo(-7, 0); ctx.lineTo(7, 0); // collar plate
+    ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.restore();
+
+    // Glowing wire detail (horizontal across torso)
+    ctx.save();
+    ctx.globalAlpha = 0.52;
+    ctx.beginPath();
+    ctx.moveTo(-7, 12);
+    ctx.bezierCurveTo(-1, 18, 1, 8, 7, 14.5);
+    ctx.lineWidth = 1.7;
+    ctx.strokeStyle = "#fafe57";
+    ctx.shadowColor = "#fe0";
+    ctx.shadowBlur = 2.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
-
-    // Metal Arms
-    ctx.save();
-    // left arm
-    ctx.beginPath();
-    ctx.moveTo(-8, -2);
-    ctx.lineTo(-18, 13);
-    ctx.lineWidth = 4.3;
-    ctx.strokeStyle = "#abdfff";
-    ctx.shadowColor = "#87e6ff55";
-    ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // joint
-    ctx.beginPath();
-    ctx.arc(-18, 13, 2.3, 0, Math.PI * 2);
-    ctx.fillStyle = "#eee";
-    ctx.fill();
-
-    // right arm
-    ctx.beginPath();
-    ctx.moveTo(8, -2);
-    ctx.lineTo(18, 13);
-    ctx.lineWidth = 4.3;
-    ctx.strokeStyle = "#abdfff";
-    ctx.shadowColor = "#87e6ffc8";
-    ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // joint
-    ctx.beginPath();
-    ctx.arc(18, 13, 2.3, 0, Math.PI * 2);
-    ctx.fillStyle = "#eee";
-    ctx.fill();
     ctx.restore();
 
-    // Legs
+    // --- ARMS: Segmented, animated metallic over flex wires
+    let arms = [
+      { x0: -10, y0: -2, shx: -17, shy: 6 + Math.sin(limbCycle)*7, hx: -21, hy: 20 + Math.sin(limbCycle)*8 }, // Left
+      { x0: 10, y0: -2, shx: 17, shy: 6 + Math.cos(limbCycle)*7, hx: 21, hy: 20 + Math.cos(limbCycle)*8 } // Right
+    ];
+    arms.forEach((arm, i) => {
+      ctx.save();
+      ctx.lineCap = "round";
+      // Shoulder to elbow
+      ctx.beginPath();
+      ctx.moveTo(arm.x0, arm.y0);
+      ctx.lineTo(arm.shx, arm.shy);
+      ctx.lineWidth = 4.8;
+      ctx.strokeStyle = "#abdfff";
+      ctx.shadowColor = "#87e6ffc8";
+      ctx.shadowBlur = 5.2;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Elbow to hand
+      ctx.beginPath();
+      ctx.moveTo(arm.shx, arm.shy);
+      ctx.lineTo(arm.hx, arm.hy);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = i? "#26c9ed" : "#19eff2";
+      ctx.shadowColor = "#7ef8fd";
+      ctx.shadowBlur = 3;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      // Arm joint bulbs
+      ctx.beginPath();
+      ctx.arc(arm.shx, arm.shy, 2.2, 0, Math.PI*2);
+      ctx.arc(arm.hx, arm.hy, 2.1, 0, Math.PI*2);
+      ctx.fillStyle = "#fff";
+      ctx.globalAlpha = 0.93;
+      ctx.shadowColor = "#c7fcff";
+      ctx.shadowBlur = 3;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      // Accent electric wire
+      ctx.save();
+      ctx.globalAlpha=0.46;
+      ctx.beginPath();
+      ctx.moveTo(arm.x0, arm.y0+2);
+      ctx.bezierCurveTo(arm.shx, arm.shy+3, arm.shx-3, (arm.hy+arm.shy)/2, arm.hx-2, arm.hy+2);
+      ctx.lineWidth=1.5;
+      ctx.strokeStyle="#2dfeff";
+      ctx.shadowColor="#2afffa";
+      ctx.shadowBlur=4;
+      ctx.stroke();
+      ctx.shadowBlur=0;
+      ctx.globalAlpha=1;
+      ctx.restore();
+    });
+
+    // --- HEAD: Dome robot helmet with joints, cyber visor and face
     ctx.save();
-    // left leg
+    // Helmet lower base (shadow/visor line)
     ctx.beginPath();
-    ctx.moveTo(-5, 17);
-    ctx.lineTo(-8, 28);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#93e4fc";
-    ctx.shadowColor = "#87e6ff55";
-    ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // right leg
-    ctx.beginPath();
-    ctx.moveTo(5, 17);
-    ctx.lineTo(8, 28);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#93e4fc";
-    ctx.shadowColor = "#87e6ff99";
-    ctx.shadowBlur = 4;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // feet (simple robotics joints)
-    ctx.beginPath();
-    ctx.arc(-8, 28, 2, 0, Math.PI * 2);
-    ctx.arc(8, 28, 2, 0, Math.PI * 2);
-    ctx.fillStyle = "#dde1eb";
+    ctx.ellipse(0, -10, 11.6, 7.6, 0, Math.PI*0.11, Math.PI*0.89, false);
+    ctx.fillStyle = "#97e7ffbb";
+    ctx.globalAlpha = 0.5;
     ctx.fill();
+    ctx.globalAlpha=1;
+
+    // Head/dome exterior with gradient
+    ctx.beginPath();
+    ctx.arc(0, -12, 11, 0, Math.PI*2);
+    let gradHead = ctx.createRadialGradient(0,-12,2,0,-12,11);
+    gradHead.addColorStop(0, "#f6fdfe");
+    gradHead.addColorStop(0.55, "#46cbf9");
+    gradHead.addColorStop(1, "#49b7fd");
+    ctx.fillStyle = gradHead;
+    ctx.shadowColor = outerGlow;
+    ctx.shadowBlur = 13;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Panel lines on head
+    ctx.beginPath();
+    ctx.moveTo(0, -23); ctx.lineTo(0, -3);
+    ctx.moveTo(-6,-20); ctx.lineTo(-4, -6);
+    ctx.moveTo(6,-20); ctx.lineTo(4,-6);
+    ctx.strokeStyle="#c2eaff77"; ctx.lineWidth=1.05;
+    ctx.globalAlpha=0.4;
+    ctx.stroke();
+    ctx.globalAlpha=1;
+    // Glowing visor/scanner
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, -13.7, 7.7, 2.6, 0,0,Math.PI*2);
+    ctx.fillStyle = "#dffcfc";
+    ctx.shadowColor = "#46e7ff";
+    ctx.shadowBlur = 11;
+    ctx.globalAlpha=0.82;
+    ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Outline for clarity
+    // Eyes (cyan-glow, animated blink shimmer)
+    let blink = Math.abs(Math.sin(t*1.5));
     ctx.save();
-    ctx.globalAlpha = 0.70;
     ctx.beginPath();
-    ctx.ellipse(0, 5, 10.8, 14, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "#1a528c";
+    ctx.arc(-3.7, -15.2, 2.3-blink, 0, Math.PI*2);
+    ctx.arc(3.7, -15.2, 2.3-blink, 0, Math.PI*2);
+    ctx.fillStyle="#fcfffd";
+    ctx.shadowColor="#7affff";
+    ctx.shadowBlur=7;
+    ctx.globalAlpha=1-blink*0.33;
+    ctx.fill(); ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.restore();
+
+    // Smiling mouth (cyber grid lines)
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, -7.3, 2.9, 1.3, 0, Math.PI*0.18, Math.PI*0.78, false);
+    ctx.strokeStyle = "#26e9fa"; ctx.lineWidth=1.13; ctx.globalAlpha=0.75;
+    ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
+    // Accent lines for cyber cheek marks
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-6,-7.3); ctx.lineTo(-3.9,-7.7);
+    ctx.moveTo(6,-7.3); ctx.lineTo(3.9,-7.7);
+    ctx.strokeStyle="#26c9ec55"; ctx.lineWidth=1;
+    ctx.globalAlpha=0.49; ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
+
+    // End helmet
+    ctx.restore();
+
+    // Outline
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 12, 15, 0, 0, Math.PI*2);
+    ctx.strokeStyle = "#1b90c7";
     ctx.lineWidth = 2.3;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(0, -10, 9.5, 0, Math.PI * 2);
-    ctx.strokeStyle = "#0a86be";
+    ctx.arc(0, -12, 11, 0, Math.PI*2);
+    ctx.strokeStyle = "#18efff";
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha=1;
     ctx.restore();
 
-    // Name label
+    // --- Name label
     ctx.font = "bold 15px Poppins, Arial";
     ctx.fillStyle = "#1976d2";
     ctx.textAlign = "center";
-    ctx.fillText("You", 0, -22);
+    ctx.fillText("You", 0, -25);
 
     // Flag carried icon
     if (flag.heldBy === "player") {
@@ -754,141 +883,153 @@ function App() {
 
     ctx.restore();
 
-    // --- ENEMY BOTS: Menacing, evil cartoon robots, sci-fi, angular silhouettes & red glowing angry eyes
+    // --- ENEMY BOTS: Layered, evil robot with animated run cycle + details ---
     /*
-      ENEMY BOT REDESIGN:
-      - Angular head/body, sharp edges, elongated limbs
-      - Deep magenta/dark colors, evil glowing red eyes
-      - Placeholder only (swap with art/sprite later)
-      - All visual styling is 2D cartoon-sci-fi evil
+      Enemy bot: multi-segment limbs, angular armored plating, red sci-fi arc eyes, spark glows, wires, piston joints.
+      Evil magenta/dark, metallic, cartoonish villain.
+      Animates similar running cycle; eyes and mouth pulse.
     */
     bots.forEach((bot, i) => {
       ctx.save();
       ctx.translate(bot.x, bot.y);
 
-      // Body: angular torso
-      ctx.beginPath();
-      ctx.moveTo(0, -7);
-      ctx.lineTo(10, 19);
-      ctx.lineTo(0, 24);
-      ctx.lineTo(-10, 19);
-      ctx.closePath();
-      ctx.fillStyle = "rgba(193,30,226,0.94)";
-      ctx.shadowColor = "#ff0050aa";
-      ctx.shadowBlur = 7;
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      let phase = (performance.now()/450 + i*77.3) * (moving?1.0:0.8);
+      let aSwing = Math.cos(phase) * 17, lSwing = Math.sin(phase) * 16;
+      // "Running": alternate/phase out arms and legs like player
+      let legs = [
+        { x1: -8, y1: 16, kx: -13, ky: 27+lSwing*0.32, fx: -14, fy: 36+lSwing, swing:lSwing },
+        { x1: +8, y1: 16, kx: +13, ky: 27-lSwing*0.22, fx: +14, fy: 36-lSwing, swing:-lSwing }
+      ];
+      legs.forEach((leg, j)=>{
+        ctx.save();
+        ctx.lineCap = "round";
+        // Thigh
+        ctx.beginPath();
+        ctx.moveTo(leg.x1, leg.y1); ctx.lineTo(leg.kx, leg.ky-2);
+        ctx.lineWidth=5.2; ctx.strokeStyle="#de65ea";
+        ctx.shadowColor="#cf7ffabc"; ctx.shadowBlur=6;
+        ctx.stroke(); ctx.shadowBlur=0;
+        // Shin
+        ctx.beginPath();
+        ctx.moveTo(leg.kx, leg.ky-2); ctx.lineTo(leg.fx, leg.fy);
+        ctx.lineWidth=4.1; ctx.strokeStyle="#bd04be";
+        ctx.shadowColor="#a700f6"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0;
+        // Joints/feet
+        ctx.beginPath();
+        ctx.arc(leg.kx, leg.ky-2, 2.2, 0, Math.PI*2);
+        ctx.arc(leg.fx, leg.fy, 2.5, 0, Math.PI*2);
+        ctx.fillStyle="#fee6ed"; ctx.shadowColor="#f0a3ff"; ctx.shadowBlur=3; ctx.fill();
+        ctx.globalAlpha=0.8; ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+      });
 
-      // Head: angular, sharp, angry helmet shape, glowing red
+      // Torso: angular, segmented plating, evil purple glow, sci-fi magenta
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(-7, -14);
-      ctx.lineTo(0, -25 - Math.sin(performance.now()/302 + i)*2.7);
-      ctx.lineTo(7, -14);
-      ctx.lineTo(2.8, -8);
-      ctx.lineTo(-2.8, -8);
-      ctx.closePath();
-      ctx.fillStyle = "#a30026";
-      ctx.shadowColor = "#f00";
-      ctx.shadowBlur = 9;
+      ctx.moveTo(-10,1); ctx.lineTo(0,20); ctx.lineTo(10,1); ctx.arc(0, 7, 13, Math.PI*0.071,Math.PI*0.94,false); ctx.closePath();
+      let bodGrad = ctx.createLinearGradient(-10,0,10,30);
+      bodGrad.addColorStop(0,"#7d02ba"); bodGrad.addColorStop(0.43,"#ff7bfa");
+      bodGrad.addColorStop(0.82,"#4e007a"); bodGrad.addColorStop(1,"#c14fd9");
+      ctx.fillStyle = bodGrad;
+      ctx.shadowColor = "#ff13fb";
+      ctx.shadowBlur = 14;
       ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Eyes: Angry red, glowing, slanted for menace
+      ctx.shadowBlur=0;
+      // Plating lines (evil accent)
+      ctx.globalAlpha = 0.53;
       ctx.beginPath();
-      ctx.ellipse(-2.7, -14, 2, 2.6, Math.PI * -.08, 0, Math.PI*2);
-      ctx.ellipse(2.7, -14, 2, 2.6, Math.PI * .07, 0, Math.PI*2);
-      ctx.fillStyle = "#ff383c";
-      ctx.shadowColor = "#ff7878";
-      ctx.shadowBlur = 12;
-      ctx.globalAlpha = 0.92;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
+      ctx.moveTo(-8,8); ctx.lineTo(8,12);
+      ctx.moveTo(-7,16); ctx.lineTo(7,8);
+      ctx.strokeStyle="#fffaff66"; ctx.lineWidth=1.35; ctx.stroke();
+      ctx.globalAlpha=1;
       ctx.restore();
 
-      // Mouth: jaggy, evil
+      // Glowing/pulsing evil wires
+      ctx.save();
+      ctx.globalAlpha=0.57;
       ctx.beginPath();
-      ctx.moveTo(-2, -5);
-      ctx.lineTo(-0.6, -3.8);
-      ctx.lineTo(0, -3.7);
-      ctx.lineTo(0.7, -3.8);
-      ctx.lineTo(2, -5.3);
-      ctx.strokeStyle = "#f61765";
-      ctx.lineWidth = 1.05;
-      ctx.globalAlpha = 0.81;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.moveTo(-7,17); ctx.bezierCurveTo(-4,15,1,29,+6,18+lSwing*0.08);
+      ctx.lineWidth=1.7; ctx.strokeStyle="#e44fff";
+      ctx.shadowColor="#f84fff"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
 
-      // Arms: angular, sharp, metal
+      // Arms (animated, clawed, multi-segment)
+      let arms = [
+        { sx:-11, sy:2, ex:-22, ey:3+aSwing*0.53, hx:-26, hy:14+aSwing*0.66 },
+        { sx:11, sy:2, ex:22, ey:3-aSwing*0.57, hx:26, hy:14-aSwing*0.66 }
+      ];
+      arms.forEach((arm,k)=>{
+        ctx.save(); ctx.lineCap="round";
+        ctx.beginPath(); ctx.moveTo(arm.sx,arm.sy); ctx.lineTo(arm.ex,arm.ey);
+        ctx.lineWidth=4.7; ctx.strokeStyle="#ffabe8"; ctx.shadowColor="#ffb3ee"; ctx.shadowBlur=6; ctx.stroke(); ctx.shadowBlur=0;
+        ctx.beginPath(); ctx.moveTo(arm.ex, arm.ey); ctx.lineTo(arm.hx, arm.hy);
+        ctx.lineWidth=3.6; ctx.strokeStyle="#bd04be"; ctx.shadowColor="#f7e8ff"; ctx.shadowBlur=4; ctx.stroke(); ctx.shadowBlur=0;
+        // Claw/joint
+        ctx.beginPath(); ctx.arc(arm.hx, arm.hy, 2.2, 0, Math.PI*2);
+        ctx.fillStyle = "#ffe8ff"; ctx.shadowColor = "#ff4efd"; ctx.shadowBlur=3; ctx.fill(); ctx.shadowBlur=0;
+        ctx.restore();
+      });
+
+      // Head: angular, helmet + glowing jaw, with angry glowing evil eyes
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(-10, 3);
-      ctx.lineTo(-20, 10 + Math.sin(performance.now()/220 + i*3)*6);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = "#520018";
-      ctx.shadowColor = "#ff82ef88";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.moveTo(-8,-12); ctx.lineTo(0,-23-Math.sin(phase)*2.7);
+      ctx.lineTo(8,-12); ctx.lineTo(3,-4); ctx.lineTo(-3,-4); ctx.closePath();
+      let grad = ctx.createRadialGradient(0,-17,1,0,-14,10);
+      grad.addColorStop(0,"#fff");
+      grad.addColorStop(0.18,"#ff7bfa");
+      grad.addColorStop(0.83,"#7d0155");
+      grad.addColorStop(1,"#770a20");
+      ctx.fillStyle=grad;
+      ctx.shadowColor="#ff12ed";
+      ctx.shadowBlur=12;
+      ctx.fill();
+      ctx.shadowBlur=0;
+      // Eyes: red arc, glowing, angry
+      let eyeS = 2.3, pulse = (Math.sin(phase*2.12)+1.1)*0.7;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(10, 3);
-      ctx.lineTo(20, 10 + Math.cos(performance.now()/200 - i)*5);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = "#520018";
-      ctx.shadowColor = "#f8f8fa88";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.ellipse(-2.8,-15.8,eyeS,2.6-pulse,Math.PI * -.10,0,Math.PI*2);
+      ctx.ellipse(2.8,-15.8,eyeS,2.6-pulse,Math.PI * +.10,0,Math.PI*2);
+      ctx.fillStyle="#fe3645";
+      ctx.shadowColor="#ff1254"; ctx.shadowBlur=14;
+      ctx.globalAlpha = 0.88+0.09*Math.sin(phase);
+      ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.restore();
+      // Angry robot mouth/jaw
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-3,-7); ctx.lineTo(-1,-5+0.4*pulse);
+      ctx.lineTo(1,-5-0.4*pulse); ctx.lineTo(3,-7);
+      ctx.lineWidth=1.18; ctx.strokeStyle="#ff9eec"; ctx.globalAlpha=0.85; ctx.stroke(); ctx.globalAlpha=1;
       ctx.restore();
 
-      // Legs: mechanical, jagged
-      ctx.save();
+      // Helmet panel lines
+      ctx.globalAlpha=0.49;
       ctx.beginPath();
-      ctx.moveTo(-5, 23);
-      ctx.lineTo(-9.5, 34 + Math.sin(performance.now()/290 - i*1.9)*3.5);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = "#42001a";
-      ctx.shadowColor = "#a70026aa";
-      ctx.shadowBlur = 4;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(5, 23);
-      ctx.lineTo(9.5, 34 + Math.cos(performance.now()/251 + i*1.7)*3.5);
-      ctx.lineWidth = 4.2;
-      ctx.strokeStyle = "#42001a";
-      ctx.shadowColor = "#f52a00aa";
-      ctx.shadowBlur = 4;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.moveTo(-4,-19); ctx.lineTo(4,-19);
+      ctx.moveTo(-1,-21); ctx.lineTo(-1,-13);
+      ctx.moveTo(1,-21); ctx.lineTo(1,-13);
+      ctx.strokeStyle="#ffeafd49"; ctx.lineWidth=1; ctx.stroke(); ctx.globalAlpha=1;
       ctx.restore();
 
       // Outline for clarity
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha=0.47;
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(0, -7);
-      ctx.lineTo(10, 19);
-      ctx.lineTo(0, 24);
-      ctx.lineTo(-10, 19);
+      ctx.moveTo(-10,1); ctx.lineTo(0,20); ctx.lineTo(10,1);
+      ctx.arc(0, 7, 13, Math.PI*0.071,Math.PI*0.94,false);
       ctx.closePath();
-      ctx.strokeStyle = "#500042";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      ctx.strokeStyle="#8b078a"; ctx.lineWidth=2.2; ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha=1;
 
-      // Name/label
+      // Bot ID
       ctx.font = "bold 12px Poppins, Arial";
-      ctx.fillStyle = "#680027";
+      ctx.fillStyle = "#bb35f3";
       ctx.textAlign = "center";
       ctx.fillText(`Bot${i + 1}`, 0, -25);
 
       ctx.restore();
 
-      // --- PLACEHOLDER NOTE: To integrate custom/external art assets (spritesheets, png, or SVG),
-      // replace the above drawing routines with ctx.drawImage(sprite, ...) or advanced Sprite objects.
-      // For production visual polish, import art to /src/assets and swap in here.
-      // Keep silhouettes/clarity strong at all group sizes.
+      // NOTE: Asset hook -- to upgrade with sprite/illustration, replace above drawing with drawImage
     });
 
     // End overlay
