@@ -424,20 +424,55 @@ function App() {
   function shootBullet() {
     // Gun cooldown (350ms)
     if (!player.canShoot || !running) return;
-    // Make sure bullet ALWAYS spawns at player's body and in correct direction (even during running animation)
+
+    // Always take the latest player position from state
     let px = player.x, py = player.y;
-    // DIRECTION:
-    // If moving, shoot in that direction. If standing, shoot in last moved direction.
-    let moveDir = player.lastMoveDir && (player.lastMoveDir.x !== 0 || player.lastMoveDir.y !== 0)
-      ? player.lastMoveDir
-      : lastDirectionRef.current || { x: 1, y: 0 }; // default to right
-    // If not moving, use facing left/right for backward compatibility
-    if (moveDir.x === 0 && moveDir.y === 0) moveDir = { x: player.facing, y: 0 };
-    // Normalize
-    let mag = Math.sqrt(moveDir.x * moveDir.x + moveDir.y * moveDir.y) || 1;
-    let dir = { x: moveDir.x / mag, y: moveDir.y / mag };
+
+    // Discover player's intended shot direction:
+    // If moving, shoot in that direction.
+    // If not moving, shoot in the last moved direction.
+    // If there was never any movement, shoot right.
+    let moveVec = { x: 0, y: 0 };
+
+    // Compute current movement vector from pressed keys for real-time direction
+    if (keyState.current.up) moveVec.y -= 1;
+    if (keyState.current.down) moveVec.y += 1;
+    if (keyState.current.left) moveVec.x -= 1;
+    if (keyState.current.right) moveVec.x += 1;
+
+    let dir; // final firing direction: unit vector
+    if (moveVec.x !== 0 || moveVec.y !== 0) {
+      // If currently moving according to input, use that direction (normalized)
+      const mag = Math.sqrt(moveVec.x * moveVec.x + moveVec.y * moveVec.y);
+      dir = { x: moveVec.x / mag, y: moveVec.y / mag };
+      // Update lastDirectionRef to this movement for the next still shot
+      lastDirectionRef.current = dir;
+    } else if (
+      player.lastMoveDir &&
+      (player.lastMoveDir.x !== 0 || player.lastMoveDir.y !== 0)
+    ) {
+      // If not moving, use most recent move direction
+      const mag = Math.sqrt(player.lastMoveDir.x * player.lastMoveDir.x + player.lastMoveDir.y * player.lastMoveDir.y) || 1;
+      dir = { x: player.lastMoveDir.x / mag, y: player.lastMoveDir.y / mag };
+    } else if (
+      lastDirectionRef.current &&
+      (lastDirectionRef.current.x !== 0 || lastDirectionRef.current.y !== 0)
+    ) {
+      // If that fails (fresh game), fallback to lastDirectionRef (yields right at start)
+      dir = { x: lastDirectionRef.current.x, y: lastDirectionRef.current.y };
+    } else {
+      // Absolute fallback: right
+      dir = { x: 1, y: 0 };
+    }
+
+    // Always normalize result (robustness)
+    const mag = Math.sqrt(dir.x * dir.x + dir.y * dir.y) || 1;
+    dir = { x: dir.x / mag, y: dir.y / mag };
+
+    // Bullet velocity
     let vx = dir.x * 8.7, vy = dir.y * 8.7;
-    // Bullet spawns at exact body center (reflects running arm/leg visually—but for clean gameplay, always from body)
+
+    // Bullet spawns at player's current actual center, always
     setBullets(bu => [
       ...bu,
       {
