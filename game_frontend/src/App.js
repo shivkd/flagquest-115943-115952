@@ -1,114 +1,185 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import "./App.css";
 
 /**
- * FlagQuest App: Minimal core 2D capture-the-flag game.
- * - Main state: player, bots, flag, scores, timer, gamestate.
- * - Canvas rendering with keyboard controls and basic bot AI.
- * - UI: Scoreboard (top), game area (center), controls (bottom).
+ * PUBLIC_INTERFACE
+ * FlagQuest: Full feature 2D capture-the-flag game, minimal UI.
+ * - Player (WASD/arrows), multiple bots (unique paths), flag, drop zone, obstacles (level/difficulty).
+ * - Minimalistic scoreboard, timer (90s), game/level state, buttons (Start, Pause, Restart).
+ * - Colors: primary (#2196f3), secondary (#43a047), accent (#ff9800).
+ * - Responsive for small screens.
  */
 
-// Constants for game
-const CANVAS_W = 420;
-const CANVAS_H = 300;
-const PLAYER_SIZE = 26;
-const BOT_SIZE = 26;
+// ---- Constants, color theme ----
+const CANVAS_W = 440;
+const CANVAS_H = 320;
+const PLAYER_SIZE = 24;
+const BOT_SIZE = 24;
 const FLAG_SIZE = 18;
-const PLAYER_SPEED = 3.1; // px per tick
-const BOT_SPEED = 2.15;
-const FLAG_ZONE_RADIUS = 32;
-const NUM_BOTS = 2;
-const DROPOFF_BOX_SIZE = 30;
+const PLAYER_SPEED = 3.2;
+const BASE_BOT_SPEED = 2.1;
+const FLAG_ZONE_RADIUS = 34;
+const DROP_BOX_SIZE = 32;
+const SESSION_TIME = 90;
+const BASE_NUM_BOTS = 2;
+const BASE_NUM_OBSTACLES = 0;
+const MAX_LEVEL = 8;
 
-// Utility: clamp position to inside field
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
+// Accent colors
+const CLR_PRI = "#2196f3", CLR_SEC = "#43a047", CLR_ACC = "#ff9800";
+const CLR_BOT = "#f25266";
+const CLR_BOT_DARK = "#ab1549";
+
+// ---- Utility helpers ----
+function clamp(v, min, max) {
+  return Math.min(Math.max(v, min), max);
 }
-
-// Helper for random position, used for flag/bots/drop-off placement
-function randomPos(w, h, margin = 18) {
+function dist(x1, y1, x2, y2) {
+  return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
+}
+function randomPos(w, h, margin = 20) {
   return {
     x: Math.random() * (w - 2 * margin) + margin,
     y: Math.random() * (h - 2 * margin) + margin,
   };
 }
-
-// Returns a random drop-off box position, away from the player's start zone and flag spawn region
-function randomDropoffBox(w, h, margin = 40) {
+function randomDropBox(w, h, margin = 55) {
   let pos;
   do {
     pos = randomPos(w, h, margin);
-  } while (
-    pos.x < CANVAS_W / 3 // Don't allow drop-off too close to player starting side
-  );
+  } while (pos.x < w / 2.1);
   return pos;
+}
+function randomObstacleRect(w, h) {
+  // Size: 40~70w x 15~28h
+  const ow = 38 + Math.random() * 34;
+  const oh = 16 + Math.random() * 13;
+  const margin = 28;
+  let ox, oy;
+  let maxTry = 30;
+  do {
+    ox = margin + Math.random() * (w - ow - 2 * margin);
+    oy = margin + Math.random() * (h - oh - 2 * margin);
+    maxTry--;
+    // Don't start too close to "home zones"
+  } while ((ox < 80 || ox + ow > w - 80) && maxTry > 0); 
+  return { x: ox, y: oy, w: ow, h: oh };
+}
+
+// ---- Obstacle collision for circle (entity) ----
+function isCircleRectColliding(cx, cy, cr, ox, oy, ow, oh) {
+  // clamp cx/cy to nearest rectangle edge, check inside circle
+  const nx = clamp(cx, ox, ox + ow), ny = clamp(cy, oy, oy + oh);
+  const dx = cx - nx, dy = cy - ny;
+  return dx*dx + dy*dy < cr*cr;
 }
 
 // PUBLIC_INTERFACE
 function App() {
-  // Game state
+  // --- Core state
   const [player, setPlayer] = useState({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
-  // Assign unique IDs to each bot to reliably track "heldBy"
-  const [bots, setBots] = useState(() =>
-    Array.from({ length: NUM_BOTS }, (_, idx) => ({
-      id: idx + 1,
-      x: CANVAS_W - 50 - idx * 30,
-      y: 2 * CANVAS_H / 3 - idx * 30,
+  const [bots, setBots] = useState([]);
+  const [flag, setFlag] = useState({ x: 0, y: 0, heldBy: null, home: true });
+  const [dropBox, setDropBox] = useState(null);
+  const [obstacles, setObstacles] = useState([]);
+  const [level, setLevel] = useState(1);
+  const [difficulty, setDifficulty] = useState(1);
+  const [timer, setTimer] = useState(SESSION_TIME);
+  const [running, setRunning] = useState(false);
+  const [gamestate, setGamestate] = useState("ready"); // "ready" "running" "paused" "over"
+  const [winner, setWinner] = useState(null);
+  const [message, setMessage] = useState("");
+
+  // --- Controls, Refs
+  const canvasRef = useRef(null);
+  const keyState = useRef({});
+
+  // --- Derived counts
+  const numBots = BASE_NUM_BOTS + Math.floor((level - 1) / 2);
+  const numObstacles = BASE_NUM_OBSTACLES + Math.max(level - 1, 0);
+
+  // --- On mount & level up: initialize field
+  useEffect(() => {
+    // Place flag in random area not in drop box/obstacle/player start
+    const newFlag = { ...randomPos(CANVAS_W, CANVAS_H, 30), heldBy: null, home: true };
+    setFlag(newFlag);
+    // Player at left
+    setPlayer({ x: 60, y: CANVAS_H/2, dx: 0, dy: 0, score: 0 })
+    // AI bots: staggered at right
+    const botsArr = Array.from({ length: numBots }, (_, i) => ({
+      id: i + 1,
+      x: CANVAS_W - 40 - (i*33),
+      y: 1.4*CANVAS_H/3 + (i*27),
       dx: 0,
       dy: 0,
       score: 0,
-    }))
-  );
-  const [flag, setFlag] = useState(() =>
-    ({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true })
-  );
-  // Drop-off box appears after player picks up flag
-  const [dropoffBox, setDropoffBox] = useState(null);
+      // botParams for unique behavior
+      params: { 
+        offset: (i * Math.PI) / numBots,
+        swing: 18 + Math.random() * 11,
+        pursuitBias: 0.4 + 0.3 * (i / Math.max(numBots-1,1)),
+      }
+    }));
+    setBots(botsArr);
 
-  const [timer, setTimer] = useState(120); // seconds
-  const [running, setRunning] = useState(false);
-  const [gamestate, setGamestate] = useState("ready"); // "ready", "running", "paused", "over"
-  const [winner, setWinner] = useState(null);
-  const [message, setMessage] = useState(""); // End-of-game/score message
+    // Drop box: disabled until player picks flag
+    setDropBox(null);
 
-  // Level/progression state: structure for future expansion
-  const [level, setLevel] = useState(1);
-  /*
-    // Future: When implementing level progression, you'll use this state.
-    // Levels can control: number of bots, obstacles, timings, etc.
-    // Example: setLevel(level+1); and handle advanced layouts.
-  */
+    // Random obstacles
+    const obsList = [];
+    let added = 0, tryCount = 0;
+    while (added < numObstacles && tryCount < 50) {
+      const obs = randomObstacleRect(CANVAS_W, CANVAS_H);
+      // Avoid overlap with player start, bots, flag
+      let overlaps = false;
+      if (dist(obs.x, obs.y, 60, CANVAS_H/2) < 75 || 
+          dist(obs.x+obs.w, obs.y+obs.h, 60, CANVAS_H/2) < 68)
+        overlaps = true;
+      if (!overlaps && dist(obs.x, obs.y, newFlag.x, newFlag.y) < 55)
+        overlaps = true;
+      if (!overlaps) {
+        obsList.push(obs);
+        added++;
+      }
+      tryCount++;
+    }
+    setObstacles(obsList);
 
-  const canvasRef = useRef(null);
-  // Controls: which keys currently pressed (WASD/Arrows)
-  const keyState = useRef({});
+    // Score, timer
+    setTimer(SESSION_TIME);
+    setMessage("");
+    setWinner(null);
+    setGamestate("ready");
+    setRunning(false);
 
-  // Timer loop for game time
+  // We want to reset on level change (including initial mount)
+  // eslint-disable-next-line
+  }, [level]);
+
+  // --- Timer
   useEffect(() => {
     if (!running) return;
     if (timer <= 0) {
       setGamestate("over");
       setRunning(false);
+      setMessage("Time's up!");
+      setWinner("bot");
+      setDropBox(null);
       return;
     }
-    const t = setInterval(() => {
-      setTimer((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
+    const t = setInterval(() => { setTimer(s => (s > 0 ? s - 1 : 0)); }, 1000);
     return () => clearInterval(t);
   }, [running, timer]);
 
-  // Keyboard controls: WASD, Arrow keys, and 'r' for restart/autostart
+  // --- Keyboard controls: listen while component active
   useEffect(() => {
     function handleDown(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
-
-      // Handle 'r' to restart and immediately start game
-      if (e.key === "r" || e.key === "R") {
-        handleRestart(true); // pass true to trigger autostart
-      }
+      if (e.key === "p" || e.key === "P") { if(running) handlePause(); }
+      if (e.key === "r" || e.key === "R") { handleRestart(true); }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -122,287 +193,276 @@ function App() {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
     };
-    // NB: intentionally left [] for proper hotkey listening.
+    // only once on mount
     // eslint-disable-next-line
   }, []);
 
-    // Main game loop (fixed timestep; updating state and drawing)
+  // --- Game logic loop (player/bots/flag/obstacles/collisions/progress)
   useEffect(() => {
     let anim;
     let prevTimestamp = performance.now();
 
+    function isMoveAllowed(nx, ny, rad, obsList) {
+      // test against all obstacles
+      for (let o of obsList) if (isCircleRectColliding(nx, ny, rad, o.x, o.y, o.w, o.h)) return false;
+      // always inside field
+      if (nx < rad || ny < rad || nx > CANVAS_W-rad || ny > CANVAS_H-rad) return false;
+      return true;
+    }
+
     function gameTick(timestamp) {
       if (gamestate !== "running") return;
-      let delta = timestamp - prevTimestamp;
+      const delta = timestamp - prevTimestamp;
       prevTimestamp = timestamp;
 
-      // PLAYER: apply controls
+      // --- Player move (+ obstacle collision)
       let [px, py] = [player.x, player.y];
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
       if (keyState.current.down) pvy += PLAYER_SPEED;
       if (keyState.current.left) pvx -= PLAYER_SPEED;
       if (keyState.current.right) pvx += PLAYER_SPEED;
-      // Normalize so diagonals are not faster
       if (pvx !== 0 || pvy !== 0) {
-        const m = Math.sqrt(pvx * pvx + pvy * pvy);
-        pvx = (pvx / m) * PLAYER_SPEED;
-        pvy = (pvy / m) * PLAYER_SPEED;
+        const nm = Math.sqrt(pvx*pvx + pvy*pvy) || 1;
+        pvx = (pvx / nm) * PLAYER_SPEED;
+        pvy = (pvy / nm) * PLAYER_SPEED;
       }
-      px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
-      py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
+      // Try new position, if not blocked by obstacles
+      if (isMoveAllowed(px + pvx, py + pvy, PLAYER_SIZE/2, obstacles)) {
+        px = clamp(px + pvx, PLAYER_SIZE/2, CANVAS_W-PLAYER_SIZE/2);
+        py = clamp(py + pvy, PLAYER_SIZE/2, CANVAS_H-PLAYER_SIZE/2);
+      }
+      else {
+        // Try X or Y move only for easier sliding
+        if (isMoveAllowed(px + pvx, py, PLAYER_SIZE/2, obstacles)) px += pvx;
+        else if (isMoveAllowed(px, py + pvy, PLAYER_SIZE/2, obstacles)) py += pvy;
+      }
 
-      // Bots: move towards flag (if not holding), else toward home
-      let newBots = bots.map((bot, i) => {
-        let target =
-          flag.heldBy === `bot:${bot.id}`
-            ? { x: CANVAS_W - 36, y: CANVAS_H / 2 }
-            : flag.heldBy === null
-              ? flag
-              : player;
-        let dx = target.x - bot.x;
-        let dy = target.y - bot.y;
-        let dist = Math.sqrt(dx * dx + dy * dy);
-        let bvx = 0, bvy = 0;
-        if (dist > 3) {
-          bvx = (dx / dist) * BOT_SPEED;
-          bvy = (dy / dist) * BOT_SPEED;
+      // ---- Bot AI: Move towards flag or player, unique offset/heuristics per bot (no clump)
+      let botArr = bots.map((bot, i, allBots) => {
+        let { params } = bot;
+        // Primary target: Flag (if not held), else player
+        let tgtX = flag.heldBy ? player.x : flag.x;
+        let tgtY = flag.heldBy ? player.y : flag.y;
+        // Unique AI: Each bot swings in different "sine" or alternate path to avoid clustering
+        // They bias towards acquisition, but with rotation based on their offset (using 'params')
+        let speed = BASE_BOT_SPEED + 0.09 * (level-1) + 0.12*(i);
+        let bias = params.pursuitBias + .33*(level-1)/MAX_LEVEL;
+        let angle = Math.atan2(tgtY-bot.y, tgtX-bot.x);
+        angle += Math.sin(performance.now()/900 + params.offset*3) * (0.08 + 0.03*i);
+        let swingDist = params.swing + 3.2*level;
+        // Try to avoid other bots: repulsion
+        let toAvoid = allBots.reduce((sum, ob) => ob!==bot && dist(bot.x,bot.y,ob.x,ob.y)<22 ? sum+Math.sign(bot.x-ob.x) : sum, 0);
+        if (toAvoid) angle += 0.11*toAvoid;
+        let wantX = bot.x + Math.cos(angle)*speed*bias + Math.cos(angle+1.5)*speed*(1-bias)*0.49 + toAvoid;
+        let wantY = bot.y + Math.sin(angle)*speed*bias + Math.sin(angle+1.7)*speed*(1-bias)*0.51 + toAvoid;
+        // Try to avoid obstacles
+        let ballRad = BOT_SIZE/2;
+        if (isMoveAllowed(wantX, wantY, ballRad, obstacles)) {
+          return { ...bot, x: clamp(wantX, ballRad, CANVAS_W-ballRad), y: clamp(wantY, ballRad, CANVAS_H-ballRad) }
+        } else if (isMoveAllowed(bot.x + speed, bot.y, ballRad, obstacles)) {
+          return { ...bot, x: clamp(bot.x + speed, ballRad, CANVAS_W-ballRad) }
+        } else if (isMoveAllowed(bot.x, bot.y + speed, ballRad, obstacles)) {
+          return { ...bot, y: clamp(bot.y + speed, ballRad, CANVAS_H-ballRad) }
         }
-        let bx = clamp(bot.x + bvx, BOT_SIZE / 2, CANVAS_W - BOT_SIZE / 2);
-        let by = clamp(bot.y + bvy, BOT_SIZE / 2, CANVAS_H - BOT_SIZE / 2);
-        return { ...bot, x: bx, y: by };
+        return { ...bot };
       });
 
-      // Utility: Euclidean distance
-      function dist(x1, y1, x2, y2) {
-        return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-      }
-
-      // Check flag pickup/drop for player (bots cannot pickup)
+      // ---- Check for collisions/captures ----
       let newFlag = { ...flag };
-      let showDropoffNow = dropoffBox;
 
-      // -- Player picks up flag --
-      if (
-        !flag.heldBy &&
-        dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE) / 2 + 2
-      ) {
+      // Player can pick up flag if close and flag not held
+      if (!flag.heldBy && dist(px, py, flag.x, flag.y) < (PLAYER_SIZE + FLAG_SIZE)/2 + 2) {
         newFlag.heldBy = "player";
         newFlag.home = false;
-        // Generate a drop-off box at random position (not too close to player start)
-        setDropoffBox(randomDropoffBox(CANVAS_W, CANVAS_H));
-        showDropoffNow = true;
+        setDropBox(randomDropBox(CANVAS_W, CANVAS_H, 58));
       }
 
-      // Collision detection: check if any AI bot catches player
-      let gameOverByAICatch = false;
-      newBots.forEach((bot, i) => {
-        // Collision threshold: if distance < sum of radii - fudge (~1)
-        if (dist(px, py, bot.x, bot.y) < (PLAYER_SIZE + BOT_SIZE) / 2 - 2) {
-          gameOverByAICatch = true;
+      // Bots catch player if close (game over)
+      let botCaught = false;
+      botArr.forEach(b => {
+        if (dist(px, py, b.x, b.y) < (PLAYER_SIZE + BOT_SIZE)/2 - 2) {
+          botCaught = true;
         }
       });
 
-      // --- Detect drop-off for score/level end ---
-      // Only enabled if player is carrying flag and dropoffBox is set
+      // --- Drop box: scoring/level up ---
       let playerScored = false;
-      if (
-        newFlag.heldBy === "player" &&
-        dropoffBox &&
-        dist(px, py, dropoffBox.x, dropoffBox.y) < (PLAYER_SIZE + DROPOFF_BOX_SIZE) / 2 + 4
-      ) {
+      if (flag.heldBy === "player" && dropBox && dist(px, py, dropBox.x, dropBox.y) < (PLAYER_SIZE + DROP_BOX_SIZE)/2 + 4) {
         playerScored = true;
       }
 
-      // Reset flag on score, increment player score, remove drop-off box
-      let newPlayer = { ...player, x: px, y: py };
-      let updatedBots = newBots;
-      let newPlayerScore = player.score;
-      let newBotScores = bots.map((b) => b.score);
-      let postScoreMessage = "";
-
+      // ---- Score, Level up, or Game Over ----
+      let newPlayerScore = player.score, newLevel = level, newWin = null, endMsg = "";
       if (playerScored) {
         newPlayerScore += 1;
-        postScoreMessage = "Flag delivered! +1 point.";
-        // Remove flag/dropoff, reset flag/bot/player position.
-        newFlag = { ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true };
-        updatedBots = bots.map((b, i) => ({
-          ...b,
-          x: CANVAS_W - 50 - i * 30,
-          y: 2 * CANVAS_H / 3 - i * 30,
-        }));
-        newPlayer = { ...newPlayer, x: 60, y: CANVAS_H / 2 };
-        setDropoffBox(null);
-      } else {
-        // Carry flag if held
-        if (newFlag.heldBy === "player") {
-          newFlag.x = px;
-          newFlag.y = py;
+        setMessage(`Level ${level} Cleared! +${level} pts.`);
+        if (level >= MAX_LEVEL) {
+          setGamestate("over");
+          setWinner("player");
+          setMessage("Congratulations! You beat all levels!");
+        } else {
+          setTimeout(()=>setLevel(lvl=>lvl+1), 1200);
         }
+        setDropBox(null);
+        // Reset flag, bots/positions next render by level effect
+        setTimer(SESSION_TIME);
+      }
+      // Game over from bot catch
+      if (botCaught) {
+        newWin = "bot";
+        setGamestate("over");
+        setWinner("bot");
+        setMessage("You were caught by a bot! Game Over.");
+        setDropBox(null);
       }
 
-      // End/game over/AI catch condition: first to 3 points or bot catches player
-      let gameOver = false;
-      let newWinner = null;
-      let endMsg = "";
-      if (gameOverByAICatch) {
-        gameOver = true;
-        newWinner = "bot";
-        endMsg = "You were caught by a bot!";
-      }
-      if (newPlayerScore >= 3) {
-        gameOver = true;
-        newWinner = "player";
-        endMsg = "You win! Great job!";
-      }
-      if (Math.max(...newBotScores) >= 3) {
-        gameOver = true;
-        newWinner = "bot";
-        endMsg = "Bots win! Try again!";
-      }
-      if (gameOver) {
-        setGamestate("over");
-        setRunning(false);
-        setWinner(newWinner);
-        setMessage(endMsg);
-        setDropoffBox(null);
-      } else if (playerScored && !gameOver) {
-        setMessage(postScoreMessage);
-        // For "level progression", you'll increment setLevel(level+1) and reset state here in the future.
-        // Example:
-        // setLevel(level + 1);
-        // add obstacles, increase bots, etc. for next level
-      } else {
-        setMessage("");
+      // Carry flag with player if holding
+      if (newFlag.heldBy === "player") {
+        newFlag.x = px;
+        newFlag.y = py;
       }
 
       // Update all state
-      setPlayer((p) => ({ ...newPlayer, score: newPlayerScore }));
-      setBots((prev) =>
-        prev.map((b, i) => ({ ...updatedBots[i], score: newBotScores[i] }))
-      );
+      setPlayer(p => ({...p, x: px, y: py, score: newPlayerScore}));
+      setBots(botArr);
       setFlag(newFlag);
 
-      // Continue loop
-      if (!gameOver) anim = requestAnimationFrame(gameTick);
+      // Timing loop for next frame
+      if (!newWin && !playerScored && gamestate === "running")
+        anim = requestAnimationFrame(gameTick);
     }
-
-    if (gamestate === "running") {
-      anim = requestAnimationFrame(gameTick);
-    }
-    return () => {
-      if (anim) cancelAnimationFrame(anim);
-    };
+    if (gamestate === "running") anim = requestAnimationFrame(gameTick);
+    return () => { if (anim) cancelAnimationFrame(anim); };
     // eslint-disable-next-line
-  }, [gamestate, running, player, bots, flag, dropoffBox, level]);
+  }, [gamestate, running, player, bots, flag, dropBox, obstacles, level]);
 
-  // Draw canvas game area
+  // --- Rendering the canvas/game area
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    // Clear
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Background field
-    ctx.fillStyle = "#e3eaf7";
+    // Field background
+    ctx.fillStyle = "#f9fbfc";
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Left zone (player's base)
+    // Player and bot home zones
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(0, CANVAS_H / 2, FLAG_ZONE_RADIUS, Math.PI / 2, Math.PI * 1.5, false);
+    ctx.arc(0, CANVAS_H/2, FLAG_ZONE_RADIUS, Math.PI/2, Math.PI*1.5, false);
     ctx.fillStyle = "#e7f8ef";
     ctx.fill();
-
-    // Right zone (bot base)
     ctx.beginPath();
-    ctx.arc(CANVAS_W, CANVAS_H / 2, FLAG_ZONE_RADIUS, Math.PI * 1.5, Math.PI / 2, false);
+    ctx.arc(CANVAS_W, CANVAS_H/2, FLAG_ZONE_RADIUS, Math.PI*1.5, Math.PI/2, false);
     ctx.fillStyle = "#f9e7e7";
     ctx.fill();
+    ctx.restore();
 
-    // Drop-off box (draw only if active)
-    if (dropoffBox) {
+    // Obstacles (rects, color secondary/accent)
+    obstacles.forEach((o, i) => {
       ctx.save();
-      ctx.globalAlpha = 0.91;
+      ctx.beginPath();
+      ctx.rect(o.x, o.y, o.w, o.h);
+      ctx.fillStyle = i%2===0 ? "#87e7ce" : "#fffbea";
+      ctx.globalAlpha = .83;
+      ctx.shadowColor = "#43a04788";
+      ctx.shadowBlur = 7;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#43a047";
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Drop box if active
+    if (dropBox) {
+      ctx.save();
+      ctx.globalAlpha = 0.93;
       ctx.beginPath();
       ctx.rect(
-        dropoffBox.x - DROPOFF_BOX_SIZE / 2,
-        dropoffBox.y - DROPOFF_BOX_SIZE / 2,
-        DROPOFF_BOX_SIZE,
-        DROPOFF_BOX_SIZE
+        dropBox.x - DROP_BOX_SIZE / 2,
+        dropBox.y - DROP_BOX_SIZE / 2,
+        DROP_BOX_SIZE, DROP_BOX_SIZE
       );
-      ctx.fillStyle = "#43a047";
-      ctx.strokeStyle = "#197c2c";
-      ctx.shadowColor = "#43a04766";
-      ctx.shadowBlur = 7;
+      ctx.fillStyle = CLR_SEC;
+      ctx.strokeStyle = "#217c43";
+      ctx.shadowColor = "#43a04799";
+      ctx.shadowBlur = 9;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.globalAlpha = 1;
-      // Draw label
       ctx.font = "bold 14px Arial";
       ctx.fillStyle = "#fff";
       ctx.textAlign = "center";
-      ctx.fillText("Drop-Off", dropoffBox.x, dropoffBox.y - DROPOFF_BOX_SIZE / 2 - 5);
+      ctx.fillText("Drop-Off", dropBox.x, dropBox.y - DROP_BOX_SIZE / 2 - 6);
       ctx.restore();
     }
 
-    // Flag
+    // Flag home zone (dashed)
     if (flag.home) {
-      ctx.strokeStyle = "#bbb";
+      ctx.save();
       ctx.setLineDash([2, 3]);
+      ctx.strokeStyle = "#bbb";
       ctx.beginPath();
-      ctx.arc(flag.x, flag.y, 23, 0, 2 * Math.PI, false);
+      ctx.arc(flag.x, flag.y, 22, 0, 2 * Math.PI, false);
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.restore();
     }
-    // Draw flag
+
+    // Actual flag (triangle/mini flag)
     ctx.save();
     ctx.translate(flag.x, flag.y);
-    ctx.rotate(-Math.PI / 14);
+    ctx.rotate(-Math.PI/14);
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(FLAG_SIZE, -FLAG_SIZE / 2.2);
     ctx.lineTo(FLAG_SIZE, FLAG_SIZE / 2.2);
     ctx.closePath();
-    ctx.fillStyle =
-      flag.heldBy === "player"
-        ? "#2196f3"
-        : flag.heldBy && typeof flag.heldBy === "object"
-        ? "#f25266"
-        : "#ff9800";
+    ctx.fillStyle = flag.heldBy === "player" ? CLR_PRI : CLR_ACC;
     ctx.fill();
-    ctx.strokeStyle = "#555";
+    ctx.strokeStyle = "#444";
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(0, FLAG_SIZE + 7);
     ctx.stroke();
     ctx.restore();
 
-    // Player
+    // Player (circle)
     ctx.beginPath();
     ctx.arc(player.x, player.y, PLAYER_SIZE / 2, 0, 2 * Math.PI, false);
-    ctx.fillStyle = "#2196f3";
+    ctx.fillStyle = CLR_PRI;
     ctx.fill();
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#135488";
     ctx.stroke();
-
-    // Player name
+    // Name
     ctx.font = "bold 15px Arial";
-    ctx.fillStyle = "#115";
+    ctx.fillStyle = "#1976d2";
     ctx.textAlign = "center";
     ctx.fillText("You", player.x, player.y - PLAYER_SIZE / 1.1);
+
+    // Flag carried icon
+    if (flag.heldBy === "player") {
+      ctx.font = "900 16px Segoe UI, Arial";
+      ctx.fillStyle = CLR_ACC;
+      ctx.fillText("🏳️", player.x, player.y + 5);
+    }
 
     // Bots
     bots.forEach((bot, i) => {
       ctx.beginPath();
       ctx.arc(bot.x, bot.y, BOT_SIZE / 2, 0, 2 * Math.PI, false);
-      ctx.fillStyle = "#f25266";
+      ctx.fillStyle = CLR_BOT;
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ab1549";
+      ctx.strokeStyle = CLR_BOT_DARK;
       ctx.stroke();
 
       ctx.font = "bold 13px Arial";
@@ -411,77 +471,52 @@ function App() {
       ctx.fillText(`Bot${i + 1}`, bot.x, bot.y - BOT_SIZE / 1.18);
     });
 
-    // Draw label: who is holding the flag?
-    if (flag.heldBy === "player") {
-      ctx.font = "900 15px Segoe UI, Arial";
-      ctx.fillStyle = "#2196f3";
-      ctx.fillText("🏳️", player.x, player.y + 5);
-    }
-    // Bots can no longer hold the flag, so don't display flag on bots.
-
-    // UI overlays: if over, draw winner
+    // End overlay
     if (gamestate === "over" || winner) {
       ctx.save();
-      ctx.globalAlpha = 0.79;
+      ctx.globalAlpha = 0.80;
       ctx.fillStyle = "#fff";
       ctx.fillRect(
-        CANVAS_W / 2 - 120,
-        CANVAS_H / 2 - 50,
-        240,
-        100
+        CANVAS_W/2 - 120,
+        CANVAS_H/2 - 55,
+        240, 110
       );
       ctx.globalAlpha = 1;
-      ctx.font = "bold 24px Segoe UI";
+      ctx.font = "bold 25px Segoe UI";
       ctx.fillStyle = "#222";
       ctx.textAlign = "center";
       ctx.fillText(
-        winner === "player" ? "You Win! 🎉" : winner === "bot" ? "Bots Win! 🤖" : "Game Over",
+        winner === "player" ? "You Win! 🎉" :
+        winner === "bot" ? "Bots Win! 🤖" : "Game Over",
         CANVAS_W / 2,
-        CANVAS_H / 2 + 6
+        CANVAS_H / 2 + 8
       );
       ctx.font = "15px Arial";
       ctx.fillStyle = "#444";
-      ctx.fillText("Press Restart to play again!", CANVAS_W / 2, CANVAS_H / 2 + 32);
+      ctx.fillText("Press Restart to play again!", CANVAS_W/2, CANVAS_H/2 + 34);
       ctx.restore();
     }
     // eslint-disable-next-line
-  }, [player, bots, flag, gamestate, winner, dropoffBox]);
+  }, [player, bots, flag, gamestate, winner, dropBox, obstacles]);
 
-  // Button actions
+  // --- Button actions
   const handleStart = () => {
     setGamestate("running");
     setRunning(true);
     setWinner(null);
     setMessage("");
-    if (timer <= 0 || gamestate === "over") setTimer(120);
+    if (timer <= 0 || gamestate === "over") setTimer(SESSION_TIME);
   };
-
   const handlePause = () => {
     if (gamestate !== "running") return;
     setGamestate("paused");
     setRunning(false);
   };
-
-  // Pass autoStart=true for hotkey restart-and-autostart
   const handleRestart = (autoStart = false) => {
-    setPlayer({ x: 60, y: CANVAS_H / 2, dx: 0, dy: 0, score: 0 });
-    setBots(
-      Array.from({ length: NUM_BOTS }, (_, idx) => ({
-        id: idx + 1,
-        x: CANVAS_W - 50 - idx * 30,
-        y: 2 * CANVAS_H / 3 - idx * 30,
-        dx: 0,
-        dy: 0,
-        score: 0,
-      }))
-    );
-    setFlag({ ...randomPos(CANVAS_W, CANVAS_H), heldBy: null, home: true });
-    setDropoffBox(null);
-    setTimer(120);
+    setLevel(1);    // resets/initializes everything (and obstacles)
+    setTimer(SESSION_TIME);
     setWinner(null);
     setMessage("");
-    // Reset level to 1 (for future level progression, could preserve level on restart if going to next stage)
-    setLevel(1);
     keyState.current = {};
     if (autoStart) {
       setGamestate("running");
@@ -492,32 +527,29 @@ function App() {
     }
   };
 
-  // Format timer mm:ss
-  const pad = (n) => String(n).padStart(2, "0");
+  // --- Render: UI overlay info
+  const pad = n => String(n).padStart(2, "0");
   const timerStr = `${pad(Math.floor(timer / 60))}:${pad(timer % 60)}`;
 
-  // Who has flag
-  let flagStatus = "Safe";
-  if (flag.heldBy === "player") flagStatus = "You";
-  // Bots can no longer hold the flag, so no "Opponent" state.
+  let statusMsg = message;
+  if (!statusMsg && (flag.heldBy === "player" && dropBox))
+    statusMsg = "Deliver the flag to the drop-off box!";
+  if (!statusMsg && gamestate === "paused")
+    statusMsg = "Game paused.";
 
-  // Display drop-off box status in UI
-  let dropoffStatus = "";
-  if (flag.heldBy === "player" && dropoffBox) {
-    dropoffStatus = "Bring the flag to the drop-off box!";
-  } else if (message) {
-    dropoffStatus = message;
-  }
+  // Level = points per win, difficulty scales by obstacles and bots
+  const pointsForLevel = level;
+  const userScore = player.score;
+  const botTopScore = Math.max(0, ...bots.map(b => b.score));
+  let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
 
-  // First bot with highest score for display
-  const oppScore = Math.max(...bots.map((b) => b.score));
   return (
     <div className="App">
       <header>
         <h1
           style={{
             margin: 0,
-            padding: "1.5rem 0",
+            padding: "1.6rem 0 1.1rem 0",
             fontSize: "2.2rem",
             letterSpacing: "0.018em",
             color: "var(--primary)",
@@ -536,18 +568,19 @@ function App() {
           background: "var(--bg-secondary)",
           borderBottom: "1px solid var(--border-color)",
           padding: "1rem 0",
+          flexWrap: "wrap",
         }}
       >
         <div style={{ fontWeight: 500 }}>
           Score:{" "}
           <span style={{ color: "var(--primary)", fontWeight: 700 }}>
-            {player.score}
+            {userScore}
           </span>
         </div>
         <div style={{ fontWeight: 500 }}>
           Opponent:{" "}
           <span style={{ color: "var(--secondary)", fontWeight: 700 }}>
-            {oppScore}
+            {botTopScore}
           </span>
         </div>
         <div style={{ fontWeight: 500 }}>
@@ -559,23 +592,30 @@ function App() {
         <div style={{ fontWeight: 500 }}>
           Flag:{" "}
           <span style={{ color: "var(--secondary)", fontWeight: 700 }}>
-            {flagStatus}
+            {flag.heldBy === "player" ? "You" : flag.home ? "Safe" : "Field"}
+          </span>
+        </div>
+        <div style={{ fontWeight: 500 }}>
+          Level:{" "}
+          <span style={{ color: CLR_ACC, fontWeight: 700 }}>
+            {level}
           </span>
         </div>
       </section>
-      {dropoffStatus && (
+      {statusMsg && (
         <div
           style={{
-            marginTop: ".8rem",
+            marginTop: ".82rem",
             textAlign: "center",
-            color: "#43a047",
+            color: statusMsg.startsWith("Level") ? "#197c2c" : "#43a047",
             fontSize: 17,
             fontWeight: 600,
             letterSpacing: "0.014em",
             minHeight: 25,
+            marginBottom: ".2rem"
           }}
         >
-          {dropoffStatus}
+          {statusMsg}
         </div>
       )}
 
@@ -584,11 +624,11 @@ function App() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          marginTop: "2.5rem",
-          marginBottom: "2.5rem",
+          marginTop: "2.2rem",
+          marginBottom: "2.3rem",
         }}
       >
-        {/* ---- Central Game Area (canvas) ---- */}
+        {/* ---- Canvas ---- */}
         <div
           style={{
             width: `${CANVAS_W}px`,
@@ -601,15 +641,12 @@ function App() {
             alignItems: "center",
             justifyContent: "center",
             marginBottom: "2.3rem",
-            maxWidth: "95vw",
+            maxWidth: "98vw",
             position: "relative",
-            outline: "none",
+            outline: "none"
           }}
           tabIndex={0}
           aria-label="Game Area"
-          onFocus={() => {
-            // Focus event can be used to allow for keyboard hotkeys
-          }}
         >
           <canvas
             ref={canvasRef}
@@ -633,6 +670,7 @@ function App() {
           style={{
             display: "flex",
             gap: "1.5rem",
+            flexWrap: "wrap"
           }}
         >
           <button
@@ -642,7 +680,7 @@ function App() {
             disabled={gamestate === "running"}
             aria-label="Start Game"
           >
-            {gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume"}
+            {btnLbl}
           </button>
           <button
             className="game-btn"
@@ -662,19 +700,20 @@ function App() {
             Restart
           </button>
         </div>
-        <div style={{ marginTop: "1.3rem", color: "#888", fontSize: 14 }}>
-          <span>
-            Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move. Grab the flag, then find the drop-off box to score!<br />
-            Opposing bots will compete for the flag!<br />
-            {/* Future: Levels will include more obstacles & harder bots. */}
-          </span>
+        <div style={{ marginTop: "1.1rem", color: "#888", fontSize: 14 }}>
+          Controls: <kbd>WASD</kbd> or <kbd>Arrow Keys</kbd> to move.
+          &nbsp; Grab the flag, deliver to drop-off box!
+          <br />
+          Avoid bots (each with unique strategy). More bots & obstacles as you level up.
+          <br />
+          <span style={{color:'#aaa',fontSize:13}}>Level up for tougher competition.&nbsp;P: Pause &nbsp; R: Restart</span>
         </div>
-        <div style={{ marginTop: "0.7rem", color: "#bbb", fontSize: 13 }}>
-          Level: {level}
+        <div style={{ marginTop: "0.8rem", color: "#bbb", fontSize: 13 }}>
+          Points per level: {pointsForLevel} &bull; Obstacles: {numObstacles} &bull; Bots: {numBots}
         </div>
       </main>
     </div>
-  );
+  )
 }
 
 export default App;
