@@ -112,6 +112,10 @@ function App() {
   const [bullets, setBullets] = useState([]);
   const [enemyHp, setEnemyHp] = useState({});
 
+  // X-TO-PLAY OVERLAY STATE
+  const [showXToPlay, setShowXToPlay] = useState(true); // at launch, overlay is shown
+  // -- will be dismissed after pressing X, then game starts
+
   // --- Controls, Refs
   const canvasRef = useRef(null);
   const keyState = useRef({});
@@ -188,6 +192,15 @@ function App() {
   // --- Keyboard controls + Reliable R-key Restart ---
   useEffect(() => {
     function handleDown(e) {
+      // --- PRESS X TO START THE GAME (when showXToPlay is true) ---
+      if (showXToPlay && (e.key === "x" || e.key === "X")) {
+        setShowXToPlay(false);
+        // Actually start the game!
+        handleStart();
+        return;
+      }
+      if (showXToPlay) return; // Pause gameplay input before X
+
       // Movement keys
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
@@ -208,12 +221,14 @@ function App() {
       }
     }
     function handleUp(e) {
+      if (showXToPlay) return; // Block game input before X
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = false;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = false;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = false;
     }
     function handleMouseDown(e) {
+      if (showXToPlay) return;
       if (e.button === 0 && running) { shootBullet(); }
     }
     window.addEventListener("keydown", handleDown);
@@ -226,7 +241,7 @@ function App() {
     };
     // DO NOT add player to deps
     // eslint-disable-next-line
-  }, [player.canShoot, running, showLevelCompleted, showLevelFailed, gamestate]); // depend on all so effect works reliably
+  }, [player.canShoot, running, showLevelCompleted, showLevelFailed, gamestate, showXToPlay]);
 
   // --- Main game loop (player, bots, flag, bullets, collisions) ---
   useEffect(() => {
@@ -477,11 +492,15 @@ function App() {
       setTimer(SESSION_TIME);
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
+
+      if (!autoStart) setShowXToPlay(true); // on restarts that are not auto, show X overlay again
     } else {
       setLevel(1);
       setTimer(SESSION_TIME);
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
+
+      if (!autoStart) setShowXToPlay(true);
     }
   };
 
@@ -507,7 +526,8 @@ function App() {
   const pointsForLevel = level;
   const userScore = player.score;
   const botTopScore = Math.max(0, ...bots.map(b => b.score));
-  let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
+  // Remove Start button variable. No longer needed.
+  //let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
 
   // ---- CANVAS RENDER LOGIC (with player running animation + bigger flag/shot origins) ----
   useEffect(() => {
@@ -1205,6 +1225,54 @@ function App() {
           tabIndex={0}
           aria-label="Game Area"
         >
+          {/* -- OVERLAY: PRESS X TO PLAY -- */}
+          {showXToPlay && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(30,35,70,0.93)",
+                zIndex: 11,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexDirection: "column",
+                borderRadius: "18px",
+                transition: "opacity 0.36s",
+                cursor: "pointer"
+              }}
+              tabIndex={-1}
+              aria-modal="true"
+            >
+              <div style={{
+                color: "#fff",
+                fontSize: "2.0rem",
+                fontFamily: "'Poppins','Segoe UI',Arial,sans-serif",
+                fontWeight: 700,
+                textShadow: "0 4px 16px #23264d, 0 1px 0 #fff4",
+                letterSpacing: "0.04em",
+                marginBottom: 13,
+                userSelect: "none"
+              }}>
+                Press <span style={{ color: "#ffd44d", fontSize: "2.3rem", padding: "0 0.2em" }}>X</span> to play
+              </div>
+              <div style={{
+                color: "#ffd44d",
+                marginTop: 5,
+                fontFamily: "inherit",
+                fontSize: "1.08em",
+                opacity: 0.87,
+                fontWeight: 500
+              }}>
+                (Keyboard required)
+              </div>
+              <div style={{
+                color: "#7bffea", fontSize: 15, marginTop: 18, opacity: 0.7, letterSpacing: "0.01em"
+              }}>
+                Start anytime by pressing <kbd>X</kbd>
+              </div>
+            </div>
+          )}
           <canvas
             ref={canvasRef}
             tabIndex={-1}
@@ -1306,18 +1374,10 @@ function App() {
               Restart
             </button>
           )}
-          {/* In normal play */}
+          {/* Main control buttons, but REMOVE the Start button */}
           {!showLevelCompleted && !showLevelFailed && (
             <>
-              <button
-                className="game-btn"
-                tabIndex={0}
-                onClick={handleStart}
-                disabled={gamestate === "running"}
-                aria-label="Start Game"
-              >
-                {btnLbl}
-              </button>
+              {/* No Start button - replaced by X-to-play overlay */}
               <button
                 className="game-btn"
                 tabIndex={0}
