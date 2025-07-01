@@ -238,12 +238,12 @@ function App() {
         else if (isMoveAllowed(px, py + pvy, PLAYER_SIZE/2, obstacles)) py += pvy;
       }
 
-      // ---- Bot AI: Move towards flag or player, unique offset/heuristics per bot (no clump)
+      // ---- Bot AI: Always pursue the player (no flag targeting) ----
       let botArr = bots.map((bot, i, allBots) => {
         let { params } = bot;
-        // Primary target: Flag (if not held), else player
-        let tgtX = flag.heldBy ? player.x : flag.x;
-        let tgtY = flag.heldBy ? player.y : flag.y;
+        // Bots always target the player position for pursuit
+        let tgtX = player.x;
+        let tgtY = player.y;
         // Unique AI: Each bot swings in different "sine" or alternate path to avoid clustering
         // They bias towards acquisition, but with rotation based on their offset (using 'params')
         let speed = BASE_BOT_SPEED + 0.09 * (level-1) + 0.12*(i);
