@@ -90,7 +90,7 @@ function App() {
     dy: 0,
     score: 0,
     facing: 1,
-    lastMoveDir: { x: 1, y: 0 }, // used for shooting when standing still
+    lastMoveDir: { x: 1, y: 0 }, // shooting direction when standing still
     canShoot: true,
     isShooting: false,
     shootAnim: 0,
@@ -114,20 +114,19 @@ function App() {
 
   // X-TO-PLAY OVERLAY STATE
   const [showXToPlay, setShowXToPlay] = useState(true); // at launch, overlay is shown
-  // -- will be dismissed after pressing X, then game starts
 
   // --- Controls, Refs
   const canvasRef = useRef(null);
   const keyState = useRef({});
   const shootCooldown = useRef(false);
-  const lastDirectionRef = useRef({ x: 1, y: 0 }); // last movement direction (unit vec)
+  const lastDirectionRef = useRef({ x: 1, y: 0 });
 
   const numBots = BASE_NUM_BOTS + Math.floor((level - 1) / 2);
   const numObstacles = BASE_NUM_OBSTACLES + Math.max(level - 1, 0);
 
   // --- On mount & level up: initialize field
   useEffect(() => {
-    // Place flag in random area not in drop box/obstacle/player start
+    // Place flag at random
     const newFlag = { ...randomPos(CANVAS_W, CANVAS_H, 30), heldBy: null, home: true };
     setFlag(newFlag);
     // Player at left, reset shooting/jump state
@@ -161,7 +160,6 @@ function App() {
     setEnemyHp(newHp);
 
     setDropBox(null);
-    // Obstacles (could expand logic, but not critical)
     setObstacles([]);
     setBullets([]);
     setTimer(SESSION_TIME);
@@ -200,14 +198,12 @@ function App() {
         e.key === "r" ||
         e.key === "R"
       ) {
-        // Only prevent scrolling for unmodified keys (avoid interfering with screen readers)
         if (
           !e.altKey &&
           !e.metaKey &&
           !e.ctrlKey &&
           !e.shiftKey
         ) {
-          // Only preventDefault if focused outside input fields (so accessibility is preserved)
           const tag = e.target && e.target.tagName
             ? e.target.tagName.toLowerCase()
             : '';
@@ -220,33 +216,33 @@ function App() {
       // --- PRESS X TO START THE GAME (when showXToPlay is true) ---
       if (showXToPlay && (e.key === "x" || e.key === "X")) {
         setShowXToPlay(false);
-        // Actually start the game!
         handleStart();
         return;
       }
-      if (showXToPlay) return; // Pause gameplay input before X
+      if (showXToPlay) return; // Block all game/gameplay controls
 
-      // Movement keys
+      // Movement keys (block while in menu overlay)
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = true;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = true;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
       if (e.key === "p" || e.key === "P") { if (running) handlePause(); }
-      // Shoot (J, K, Z) or mouse
       if (["j", "J", "k", "K", "z", "Z"].includes(e.key)) { shootBullet(); }
+
       // -- R to restart level/game always
       if (e.key === "r" || e.key === "R") {
-        // Prevent repeated R from spamming
         // If in level completed/failed, restart at current. Otherwise restart whole game
         if (showLevelCompleted || showLevelFailed || gamestate === "failed" || gamestate === "postlevel") {
-          robustRestart(true, { restartAtCurrentLevel: true });
+          robustRestart(false, { restartAtCurrentLevel: true });
+          setShowXToPlay(true);
         } else {
-          robustRestart(true, { restartAtCurrentLevel: false });
+          robustRestart(false, { restartAtCurrentLevel: false });
+          setShowXToPlay(true);
         }
       }
     }
     function handleUp(e) {
-      if (showXToPlay) return; // Block game input before X
+      if (showXToPlay) return; // Block input before start
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
       if (["ArrowDown", "s", "S"].includes(e.key)) keyState.current.down = false;
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = false;
@@ -274,7 +270,6 @@ function App() {
     let prevTimestamp = performance.now();
 
     function isMoveAllowed(nx, ny, rad, obsList) {
-      // No obstacles in minimal version
       if (nx < rad || ny < rad || nx > CANVAS_W - rad || ny > CANVAS_H - rad) return false;
       return true;
     }
@@ -284,7 +279,7 @@ function App() {
       const delta = timestamp - prevTimestamp;
       prevTimestamp = timestamp;
 
-      // --- Handle Player Movement ---
+      // --- Handle Player Movement ----
       let [px, py] = [player.x, player.y];
       let pvx = 0, pvy = 0;
       if (keyState.current.up) pvy -= PLAYER_SPEED;
@@ -297,25 +292,24 @@ function App() {
         const mag = Math.sqrt(pvx * pvx + pvy * pvy) || 1;
         pvx = (pvx / mag) * PLAYER_SPEED;
         pvy = (pvy / mag) * PLAYER_SPEED;
-        currentMove = { x: pvx / PLAYER_SPEED, y: pvy / PLAYER_SPEED }; // unit vector
+        currentMove = { x: pvx / PLAYER_SPEED, y: pvy / PLAYER_SPEED };
         lastDirectionRef.current = currentMove;
       }
-      // Facing left/right for bullet/visuals
+      // Facing for drawing
       let lastFace = player.facing;
       if (pvx > 0) lastFace = 1;
       if (pvx < 0) lastFace = -1;
-      // Try new position
+      // New position logic
       if (isMoveAllowed(px + pvx, py + pvy, PLAYER_SIZE / 2, obstacles)) {
         px = clamp(px + pvx, PLAYER_SIZE / 2, CANVAS_W - PLAYER_SIZE / 2);
         py = clamp(py + pvy, PLAYER_SIZE / 2, CANVAS_H - PLAYER_SIZE / 2);
       }
 
-      // Store last movement direction on the player (for bullets)
       let newLastMoveDir = (pvx !== 0 || pvy !== 0)
         ? { x: pvx / PLAYER_SPEED, y: pvy / PLAYER_SPEED }
         : player.lastMoveDir;
 
-      // --- Bots AI (crude homing on player) ---
+      // --- Bots AI ---
       let botArr = bots.map((bot, i) => {
         let tgtX = px, tgtY = py;
         let speed = BASE_BOT_SPEED + 0.09 * (level - 1) + 0.12 * (i);
@@ -327,7 +321,7 @@ function App() {
         return { ...bot, x: nx, y: ny };
       });
 
-      // --- Bullets: move, check collision with bots, remove bullets on hit/out-of-bounds ---
+      // --- Bullets, enemy collision ---
       let newBullets = [];
       let newEnemyHp = { ...enemyHp };
       let botsToDefeat = new Set();
@@ -343,7 +337,6 @@ function App() {
           traveled > 520
         )
           dead = true;
-        // Hit enemy bot?
         let hitBotIdx = -1;
         bots.forEach((b, i) => {
           if (
@@ -364,7 +357,6 @@ function App() {
         }
         if (!dead) newBullets.push({ ...bullet, x: bx, y: by, age: bullet.age + 1 });
       }
-      // Remove defeated bots
       let remainingBots = botArr.filter(b => !botsToDefeat.has(b.id));
       Object.keys(newEnemyHp).forEach(
         id => (newEnemyHp[id].hitAnim = Math.max(0, newEnemyHp[id].hitAnim - 0.12))
@@ -413,7 +405,7 @@ function App() {
         setGamestate("over");
         setWinner("bot");
         setShowLevelFailed(true);
-        setMessage("You Failed! Press R to retry this level.");
+        setMessage("You Failed! Press Continue to return to menu.");
         setDropBox(null);
         setRunning(false);
         setGamestate("failed");
@@ -447,57 +439,36 @@ function App() {
 
   // PUBLIC_INTERFACE
   function shootBullet() {
-    // Gun cooldown (350ms)
     if (!player.canShoot || !running) return;
-
-    // Always take the latest player position from state
     let px = player.x, py = player.y;
-
-    // Discover player's intended shot direction:
-    // If moving, shoot in that direction.
-    // If not moving, shoot in the last moved direction.
-    // If there was never any movement, shoot right.
     let moveVec = { x: 0, y: 0 };
-
-    // Compute current movement vector from pressed keys for real-time direction
     if (keyState.current.up) moveVec.y -= 1;
     if (keyState.current.down) moveVec.y += 1;
     if (keyState.current.left) moveVec.x -= 1;
     if (keyState.current.right) moveVec.x += 1;
 
-    let dir; // final firing direction: unit vector
+    let dir;
     if (moveVec.x !== 0 || moveVec.y !== 0) {
-      // If currently moving according to input, use that direction (normalized)
       const mag = Math.sqrt(moveVec.x * moveVec.x + moveVec.y * moveVec.y);
       dir = { x: moveVec.x / mag, y: moveVec.y / mag };
-      // Update lastDirectionRef to this movement for the next still shot
       lastDirectionRef.current = dir;
     } else if (
       player.lastMoveDir &&
       (player.lastMoveDir.x !== 0 || player.lastMoveDir.y !== 0)
     ) {
-      // If not moving, use most recent move direction
       const mag = Math.sqrt(player.lastMoveDir.x * player.lastMoveDir.x + player.lastMoveDir.y * player.lastMoveDir.y) || 1;
       dir = { x: player.lastMoveDir.x / mag, y: player.lastMoveDir.y / mag };
     } else if (
       lastDirectionRef.current &&
       (lastDirectionRef.current.x !== 0 || lastDirectionRef.current.y !== 0)
     ) {
-      // If that fails (fresh game), fallback to lastDirectionRef (yields right at start)
       dir = { x: lastDirectionRef.current.x, y: lastDirectionRef.current.y };
     } else {
-      // Absolute fallback: right
       dir = { x: 1, y: 0 };
     }
-
-    // Always normalize result (robustness)
     const mag = Math.sqrt(dir.x * dir.x + dir.y * dir.y) || 1;
     dir = { x: dir.x / mag, y: dir.y / mag };
-
-    // Bullet velocity
     let vx = dir.x * 8.7, vy = dir.y * 8.7;
-
-    // Bullet spawns at player's current actual center, always
     setBullets(bu => [
       ...bu,
       {
@@ -543,7 +514,6 @@ function App() {
 
   // PUBLIC_INTERFACE
   const handleRestart = (autoStart = false, options = {}) => {
-    // Legacy: DELEGATED to robustRestart to avoid duplicated logic
     robustRestart(autoStart, options);
   };
 
@@ -554,15 +524,11 @@ function App() {
    * @param {object} options - Options object: {restartAtCurrentLevel: bool}
    */
   function robustRestart(autoStart = false, options = {}) {
-    // Reset overlay/level UI panels and in-progress dialogs
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
     setWinner(null);
     setMessage("");
-    // Clear control state
     keyState.current = {};
-
-    // Defensive reset for all dynamic game state pieces.
     setBullets([]);
     setBots([]);
     setFlag({ x: 0, y: 0, heldBy: null, home: true });
@@ -586,30 +552,23 @@ function App() {
     setTimer(SESSION_TIME);
 
     if (options && options.restartAtCurrentLevel) {
-      // Don't change level, but ensure field is re-initialized (useEffect on [level])
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
       if (!autoStart) setShowXToPlay(true);
-      // Trigger field/init by setting level to current - 1 then back (forces re-mount for hard reset)
       setLevel(lvl => {
-        // This short cycle triggers the useEffect([level]) even if level didn't get changed externally
-        // If on first level, don't go below 1
         const previous = Math.max(lvl - 1, 1);
         const curr = lvl;
         if (previous !== curr) {
           setTimeout(() => setLevel(curr), 1);
           return previous;
         }
-        // If at lvl 1, force an update via a dummy state if needed
         return curr;
       });
     } else {
-      // Reset to base level 1
       setLevel(1);
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
       if (!autoStart) setShowXToPlay(true);
-      // UseEffect([level]) will trigger new field/positions etc.
     }
   }
 
@@ -635,517 +594,8 @@ function App() {
   const pointsForLevel = level;
   const userScore = player.score;
   const botTopScore = Math.max(0, ...bots.map(b => b.score));
-  // Remove Start button variable. No longer needed.
-  //let btnLbl = gamestate === "ready" || gamestate === "paused" ? "Start" : "Resume";
 
-  // ---- CANVAS RENDER LOGIC (with player running animation + bigger flag/shot origins) ----
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-
-    // Field background
-    ctx.fillStyle = "#f9fbfc";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-    // Obstacles (optional/minimal)
-    // (skipped for basic visual clarity)
-
-    // Drop box area (if exists)
-    if (dropBox) {
-      ctx.save();
-      ctx.globalAlpha = 0.51;
-      ctx.beginPath();
-      ctx.arc(dropBox.x, dropBox.y, DROP_BOX_SIZE / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = "#7bffa6";
-      ctx.shadowColor = "#9bff4a";
-      ctx.shadowBlur = 9;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 3.3;
-      ctx.strokeStyle = "#50e968";
-      ctx.stroke();
-      ctx.font = "800 22px Arial";
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#202";
-      ctx.globalAlpha = 0.92;
-      ctx.fillText("⬇️", dropBox.x, dropBox.y + 8);
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Draw flag (free-standing or player-held, bigger/scifi-cooler)
-    if (flag && !flag.heldBy) {
-      ctx.save();
-      ctx.translate(flag.x, flag.y);
-      // Big shadow for sci-fi effect
-      ctx.save();
-      ctx.globalAlpha = 0.25;
-      ctx.beginPath();
-      ctx.ellipse(0, FLAG_SIZE * 0.34, FLAG_SIZE * 0.51, FLAG_SIZE * 0.21, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#ead730";
-      ctx.shadowColor = "#ffe576";
-      ctx.shadowBlur = 13;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-      // Cartoon flag staff
-      ctx.save();
-      ctx.lineWidth = 3.6;
-      ctx.strokeStyle = "#23264d";
-      ctx.beginPath();
-      ctx.moveTo(-FLAG_SIZE*0.34, -FLAG_SIZE/2+6);
-      ctx.lineTo(-FLAG_SIZE*0.34, FLAG_SIZE*0.4);
-      ctx.stroke();
-      ctx.restore();
-      
-      // Sci-fi glowing main flag blob
-      ctx.beginPath();
-      ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = CLR_ACC;
-      ctx.shadowColor = "#ffe576";
-      ctx.shadowBlur = 16;
-      ctx.globalAlpha = 0.94;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 2.7;
-      ctx.strokeStyle = "#ffe576";
-      ctx.stroke();
-
-      // Layer: stylized cartoon flag (emoji plus trail)
-      ctx.save();
-      ctx.font = "bold 25px Arial";
-      ctx.textAlign = "center";
-      ctx.globalAlpha = 0.99;
-      ctx.fillStyle = "#23264d";
-      ctx.rotate(-0.08);
-      ctx.fillText("🏳️", 4, 10);
-      // Sparkle trail (cartoony)
-      ctx.globalAlpha = 0.58;
-      ctx.beginPath();
-      ctx.moveTo(8, 3); ctx.lineTo(17, 7.6); ctx.lineWidth = 2.2;
-      ctx.strokeStyle = "#ffe3ab";
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-      ctx.restore();
-    }
-
-    // Draw bullets (blaster shots, yellow dots) - (no change vs original)
-    for (const bullet of bullets) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = "#ffd44d";
-      ctx.shadowColor = "#ffe576";
-      ctx.shadowBlur = 8;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // --- Draw ENEMY BOTS (Complex robotic/cartoony style, distinct personality) ---
-    for (const bot of bots) {
-      ctx.save();
-      ctx.translate(bot.x, bot.y);
-
-      // --- Drop Shadow
-      ctx.save();
-      ctx.globalAlpha = 0.30;
-      ctx.beginPath();
-      ctx.ellipse(0, 13, 12, 5, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "#842c74";
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // -- Body: main chassis (squat dome with "jaw" underplate) --
-      ctx.beginPath();
-      ctx.ellipse(0, 0, BOT_SIZE / 2, BOT_SIZE / 2.25, 0, 0, Math.PI * 2);
-      let hpEnt = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
-      if (hpEnt.hitAnim > 0.1) {
-        ctx.globalAlpha = 0.52 + 0.43 * Math.abs(Math.cos(hpEnt.hitAnim * 21));
-      }
-      ctx.fillStyle = "#f0b9fc";
-      ctx.shadowColor = "#ffbcf6";
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = 2.2;
-      ctx.strokeStyle = "#b843ac";
-      ctx.stroke();
-      // Lower jaw plate
-      ctx.beginPath();
-      ctx.ellipse(0, 11, 11, 6, 0, Math.PI * 2, false);
-      ctx.fillStyle = "#fdf5fe";
-      ctx.globalAlpha = 0.70;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // -- Eye: Large robotic glass with glint
-      ctx.beginPath();
-      ctx.ellipse(0, -4, 7, 5, 0, 0, 2 * Math.PI);
-      ctx.fillStyle = "#fff";
-      ctx.shadowColor = "#c6c9ff";
-      ctx.shadowBlur = 7;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      ctx.beginPath();
-      ctx.ellipse(0, -4, 4.1, 2.7, 0, 0, 2 * Math.PI);
-      ctx.fillStyle = "#382454";
-      ctx.fill();
-
-      // Eye highlight
-      ctx.beginPath();
-      ctx.arc(-1.9, -6, 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = "#caf1ff";
-      ctx.globalAlpha = 0.62;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Evil "eyebrows"
-      ctx.save();
-      ctx.strokeStyle = "#8d2ea1";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-5, -8.2);
-      ctx.quadraticCurveTo(0, -12, 5, -8.1);
-      ctx.stroke();
-      ctx.restore();
-
-      // -- Unique details: ["antenna", body highlights, jawline bolts, jaw-grill]
-      // Antenna
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(0, -BOT_SIZE/2 + 3, 2.38, 0, Math.PI*2);
-      ctx.fillStyle = "#ffd44d";
-      ctx.shadowColor = "#ffe899";
-      ctx.shadowBlur = 7;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.moveTo(0, -BOT_SIZE/2 + 3); // ball
-      ctx.lineTo(0, -BOT_SIZE/2 + 10);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#8267fb";
-      ctx.stroke();
-      ctx.restore();
-
-      // Cheek bolts (cartoon robot)
-      ctx.beginPath();
-      ctx.arc(-8.2, 1, 1.33, 0, Math.PI * 2);
-      ctx.arc(8.2, 1, 1.33, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffd44d";
-      ctx.globalAlpha = 0.74;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      // Jaw "grill" (vertical teeth lines)
-      ctx.save();
-      ctx.strokeStyle = "#bd8fdc";
-      ctx.lineWidth = 1.1;
-      for (let gx = -5; gx <= 5; gx += 2.5) {
-        ctx.beginPath();
-        ctx.moveTo(gx, 8);
-        ctx.lineTo(gx, 14.2);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Side panels / body accents
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(-9.8, 0.1, 2.1, 2.7, -0.38, 0, Math.PI * 2);
-      ctx.ellipse(9.8, -0.7, 2.1, 2.7, 0.38, 0, Math.PI * 2);
-      ctx.fillStyle = "#ff99e7";
-      ctx.globalAlpha = 0.6;
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-
-      // -- "Arms": Little claw arms (angle, body-side color)
-      ctx.save();
-      ctx.strokeStyle = "#dbbcf9";
-      ctx.lineWidth = 3.3;
-      ctx.beginPath();
-      ctx.moveTo(-BOT_SIZE/2 + 2, 3);
-      ctx.lineTo(-BOT_SIZE/2 - 5, 8);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(BOT_SIZE/2 - 2, 3);
-      ctx.lineTo(BOT_SIZE/2 + 5, 8);
-      ctx.stroke();
-      // Claw ends
-      ctx.lineWidth = 2.1;
-      ctx.beginPath();
-      ctx.arc(-BOT_SIZE/2 - 5, 8, 2, 0, Math.PI*2);
-      ctx.arc(BOT_SIZE/2 + 5, 8, 2, 0, Math.PI*2);
-      ctx.strokeStyle = "#ffebf9";
-      ctx.stroke();
-      ctx.restore();
-
-      // -- Leg "tracks"/wheels
-      ctx.save();
-      ctx.fillStyle = "#d066e1";
-      ctx.beginPath();
-      ctx.ellipse(-5, BOT_SIZE/2 - 3, 3.1, 1.5, 0.15, 0, Math.PI*2);
-      ctx.ellipse(5, BOT_SIZE/2 - 3, 3.1, 1.5, -0.15, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-
-      // HP dots above head (robotic "LEDs")
-      ctx.save();
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(-7 + i * 7, -18, 2.4, 0, 2 * Math.PI);
-        ctx.fillStyle = i < hpEnt.hp ? "#fff" : "#885e9b";
-        ctx.globalAlpha = 0.88;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      ctx.restore();
-
-      // Name label (above head, robot cartoon font style)
-      ctx.save();
-      ctx.globalAlpha = 0.8;
-      ctx.font = "700 13px Poppins, Arial";
-      ctx.fillStyle = "#b722b1";
-      ctx.textAlign = "center";
-      ctx.fillText("BOT", 0, -23);
-      ctx.restore();
-
-      ctx.restore();
-    }
-
-    // --- Draw PLAYER (sci-fi android/hero-bot, running animation + arms/legs swing) ---
-    ctx.save();
-    ctx.translate(player.x, player.y);
-
-    // Figure running state: if moving, animate, else idle
-    const now = performance.now();
-    const moving = Math.abs(player.dx) > 0.1 || Math.abs(player.dy) > 0.1 ||
-      (keyState.current.up || keyState.current.down || keyState.current.left || keyState.current.right);
-    // Use time-based animation so animation continues even when idle at last-move
-    const runPhase = moving ? (now / 110) % (2 * Math.PI) : 0;
-    // Set for use in animation
-    const armSwing = moving ? Math.sin(runPhase) * 9.5 : 0;
-    const legSwing = moving ? Math.sin(runPhase + Math.PI) * 9.5 : 0;
-
-    // Drop Shadow, larger and softer
-    ctx.save();
-    ctx.globalAlpha = 0.38;
-    ctx.beginPath();
-    ctx.ellipse(0, 16, 14, 6.1, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#33acf72d";
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // -- Main Body (rounded pill + 3D chest panel) --
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, 0, PLAYER_SIZE / 2, PLAYER_SIZE / 2.12, 0, 0, Math.PI * 2); // main torso
-    ctx.fillStyle = CLR_PRI;
-    ctx.shadowColor = "#94fdff";
-    ctx.shadowBlur = 13;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 2.18;
-    ctx.strokeStyle = "#17e1fe";
-    ctx.stroke();
-    // 3D chest/visor panel
-    ctx.beginPath();
-    ctx.ellipse(0, 2.6, 9, 6.0, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
-    ctx.globalAlpha = 0.12;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // -- Helmet "visor" (large faceplate, blue tint, shiny)
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(0, -6, 9, 5.5, 0, 0, 2 * Math.PI);
-    ctx.fillStyle = "#e0fcff";
-    ctx.globalAlpha = 0.26;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse(0, -6, 8, 4.7, 0.05, 0, 2 * Math.PI);
-    ctx.fillStyle = "#b8ecfb";
-    ctx.globalAlpha = 0.38;
-    ctx.fill();
-    // Shine
-    ctx.beginPath();
-    ctx.ellipse(-3.2, -8, 2.2, 0.85, -0.28, 0, 2 * Math.PI);
-    ctx.fillStyle = "#ffffff";
-    ctx.globalAlpha = 0.33;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // -- Eyes (anime/cartoony, glowing blue)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(-3.2, -7.1, 1.35, 0, Math.PI * 2);
-    ctx.arc( 3.5, -7.0, 1.35, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
-    ctx.globalAlpha = 0.8;
-    ctx.shadowColor = "#73ecff";
-    ctx.shadowBlur = 8;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    // Pupils/irises
-    ctx.beginPath();
-    ctx.arc(-3.2, -7.2, 0.6, 0, Math.PI * 2);
-    ctx.arc( 3.5, -7.1, 0.6, 0, Math.PI * 2);
-    ctx.fillStyle = "#249df7";
-    ctx.globalAlpha = 0.85;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    // Eyebrows (friendly curve)
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(-4.4, -9);
-    ctx.quadraticCurveTo(-3.1, -10, -1.7, -8.8);
-    ctx.moveTo(2, -9.2);
-    ctx.quadraticCurveTo(3.8, -10.1, 5.6, -8.5);
-    ctx.strokeStyle = "#36b6ea";
-    ctx.lineWidth = 1.2;
-    ctx.globalAlpha = 0.7;
-    ctx.stroke();
-    ctx.restore();
-    ctx.restore();
-
-    // -- Antenna module (asym LED, adds charm)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, -PLAYER_SIZE/2 + 2.5, 2.2, 0, Math.PI*2);
-    ctx.fillStyle = "#ffd44d";
-    ctx.globalAlpha = 0.93;
-    ctx.shadowColor = "#fff2ad";
-    ctx.shadowBlur = 8;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.globalAlpha = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, -PLAYER_SIZE/2 + 2.5);
-    ctx.lineTo(0.8, -PLAYER_SIZE/2 + 8.5);
-    ctx.lineWidth = 2.2;
-    ctx.strokeStyle = "#17e1fe";
-    ctx.stroke();
-    ctx.restore();
-
-    // -- ARMS: animate for running
-    ctx.save();
-    ctx.lineWidth = 5.2;
-    ctx.strokeStyle = "#93eaff";
-    ctx.beginPath();
-    // Left Arm, swings back when right leg is forward and vice versa
-    ctx.moveTo(-PLAYER_SIZE / 2 + 2, 0);
-    ctx.lineTo(-PLAYER_SIZE / 2 - 7, 7 + armSwing);
-    // Right Arm
-    ctx.moveTo(PLAYER_SIZE / 2 - 2, 0);
-    ctx.lineTo(PLAYER_SIZE / 2 + 7, 7 - armSwing);
-    ctx.stroke();
-
-    // Arm fingerprints (static, end of limb)
-    ctx.lineWidth = 2.1;
-    ctx.strokeStyle = "#ffd44d";
-    ctx.beginPath();
-    ctx.moveTo(-PLAYER_SIZE / 2 - 6, 7 + armSwing);
-    ctx.lineTo(-PLAYER_SIZE / 2 - 4, 8.9 + armSwing);
-    ctx.moveTo(PLAYER_SIZE / 2 + 6, 7 - armSwing);
-    ctx.lineTo(PLAYER_SIZE / 2 + 4, 8.9 - armSwing);
-    ctx.stroke();
-    ctx.restore();
-
-    // -- LEGS (running: wheel bases "bounce" forward/back per leg swing)
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(-5.5, PLAYER_SIZE / 2 - 2.5 + legSwing * 0.13, 3.5, 1.7, 0.12, 0, Math.PI * 2);
-    ctx.ellipse(5.5, PLAYER_SIZE / 2 - 2.5 - legSwing * 0.13, 3.5, 1.7, -0.12, 0, Math.PI * 2);
-    ctx.fillStyle = "#27eada";
-    ctx.globalAlpha = 0.72;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // -- Cheek "LEDs"
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(-8.2, 0, 1.33, 0, Math.PI * 2);
-    ctx.arc(8.2, 0.8, 1.33, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffd44d";
-    ctx.globalAlpha = 0.75;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // -- If holding a flag, draw the flag (bigger, sci-fi, cartoon)
-    if (flag && flag.heldBy === "player") {
-      ctx.save();
-      // "Attach" to right hand when running (limb swings)
-      const handX = 13 + armSwing * 0.18;
-      const handY = 8 + armSwing * 0.20;
-      ctx.translate(handX, handY);
-      // Staff
-      ctx.save();
-      ctx.lineWidth = 3.1;
-      ctx.strokeStyle = "#23264d";
-      ctx.beginPath();
-      ctx.moveTo(-FLAG_SIZE*0.34, -FLAG_SIZE/2+6);
-      ctx.lineTo(-FLAG_SIZE*0.34, FLAG_SIZE*0.4);
-      ctx.stroke();
-      ctx.restore();
-      // Main flag
-      ctx.beginPath();
-      ctx.arc(0, 0, FLAG_SIZE / 2, 0, 2 * Math.PI);
-      ctx.fillStyle = CLR_ACC;
-      ctx.shadowColor = "#ffd44d";
-      ctx.shadowBlur = 12;
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 2.1;
-      ctx.strokeStyle = "#ffe576";
-      ctx.stroke();
-      ctx.font = "bold 21px Arial";
-      ctx.fillStyle = "#303865";
-      ctx.globalAlpha = 0.98;
-      ctx.fillText("🏳️", 0, 7);
-      // Little sparkle accent
-      ctx.globalAlpha = 0.60;
-      ctx.beginPath();
-      ctx.moveTo(8, 3);
-      ctx.lineTo(18, 10.5);
-      ctx.lineWidth = 2.0;
-      ctx.strokeStyle = "#ffe799";
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.restore();
-    }
-
-    // Name label (above, in friendly accent blue)
-    ctx.save();
-    ctx.globalAlpha = 0.88;
-    ctx.font = "bold 14px Poppins, Arial";
-    ctx.fillStyle = "#1799e7";
-    ctx.textAlign = "center";
-    ctx.fillText("YOU", 0, -20);
-    ctx.restore();
-
-    ctx.restore();
-    // End of drawing
-  }, [player, bots, flag, gamestate, winner, dropBox, obstacles, bullets, enemyHp, showLevelCompleted, showLevelFailed]);
-
-  // --- Render: UI overlay info
+  // --- RENDER ---
   return (
     <div className="App">
       <header>
@@ -1205,7 +655,7 @@ function App() {
           </span>
         </div>
       </section>
-      {/* LEVEL/FALIURE OVERLAY */}
+      {/* LEVEL/FAILURE OVERLAY */}
       {showLevelOverlay && (
         <div
           style={{
@@ -1250,19 +700,17 @@ function App() {
                     autoFocus
                     tabIndex={0}
                     onClick={() => {
-                      // Repair: FULLY clear overlays/states, advance to new level, ensure it's in running/game state with overlays off
+                      // After victory: advance to next level and skip menu
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
                       setWinner(null);
                       setMessage("");
-                      setShowXToPlay(false); // skip X-to-play overlay for next level
+                      setShowXToPlay(false);
                       setLevel(lvl => lvl + 1);
-                      // "level" useEffect will re-init field/entities; immediately start new level by setting state to running after short delay for state flush
                       setTimeout(() => {
                         setGamestate("running");
                         setRunning(true);
                       }, 5);
-                      // Defensive: clear any key input buffer or dialog focus
                       if (typeof window !== "undefined") {
                         window.focus && window.focus();
                         if (document.activeElement) {
@@ -1277,9 +725,13 @@ function App() {
                     className="game-btn"
                     tabIndex={0}
                     onClick={() => {
-                      handleRestart(false, { restartAtCurrentLevel: true });
+                      // Reset to menu overlay
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
+                      setWinner(null);
+                      setMessage("");
+                      robustRestart(false, { restartAtCurrentLevel: true });
+                      setShowXToPlay(true);
                     }}
                   >
                     Restart
@@ -1292,24 +744,16 @@ function App() {
                   autoFocus
                   tabIndex={0}
                   onClick={() => {
-                    // Fully clear overlays/states, robust restart, and immediately start gameplay
-                    handleRestart(true, { restartAtCurrentLevel: true });
+                    // On defeat: always return to X-to-play menu and await user
                     setShowLevelCompleted(false);
                     setShowLevelFailed(false);
-                    setShowXToPlay(false);
                     setWinner(null);
                     setMessage("");
-                    setGamestate("running");
-                    setRunning(true);
-                    if (typeof window !== "undefined") {
-                      window.focus && window.focus();
-                      if (document.activeElement) {
-                        document.activeElement.blur();
-                      }
-                    }
+                    robustRestart(false, { restartAtCurrentLevel: true });
+                    setShowXToPlay(true);
                   }}
                 >
-                  Restart
+                  Continue
                 </button>
               )}
             </div>
@@ -1481,7 +925,6 @@ function App() {
           }}
         >
           {/* Overlay logic */}
-          {/* Advance button removed: logic now handled in overlay for correct state restoration */}
           {showLevelFailed && !showLevelCompleted && (
             <button
               className="game-btn"
@@ -1489,31 +932,20 @@ function App() {
               autoFocus
               aria-label="Restart Level"
               onClick={() => {
-                // Fully clear overlays/states, robust restart, and immediately start gameplay
-                handleRestart(true, { restartAtCurrentLevel: true });
+                // Block restart button: go to menu overlay to await X
                 setShowLevelCompleted(false);
                 setShowLevelFailed(false);
-                setShowXToPlay(false);
                 setWinner(null);
                 setMessage("");
-                setGamestate("running");
-                setRunning(true);
-                // Defensive: clear any key input buffer or dialog focus
-                if (typeof window !== "undefined") {
-                  window.focus && window.focus();
-                  if (document.activeElement) {
-                    document.activeElement.blur();
-                  }
-                }
+                robustRestart(false, { restartAtCurrentLevel: true });
+                setShowXToPlay(true);
               }}
             >
               Restart
             </button>
           )}
-          {/* Main control buttons, but REMOVE the Start button */}
           {!showLevelCompleted && !showLevelFailed && (
             <>
-              {/* No Start button - replaced by X-to-play overlay */}
               <button
                 className="game-btn"
                 tabIndex={0}
@@ -1527,21 +959,12 @@ function App() {
                 className="game-btn"
                 tabIndex={0}
                 onClick={() => {
-                  // Robust restart logic: clear overlays, resume gameplay immediately
-                  handleRestart(true, { restartAtCurrentLevel: true });
+                  robustRestart(false, { restartAtCurrentLevel: true });
                   setShowLevelCompleted(false);
                   setShowLevelFailed(false);
-                  setShowXToPlay(false);
+                  setShowXToPlay(true);
                   setWinner(null);
                   setMessage("");
-                  setGamestate("running");
-                  setRunning(true);
-                  if (typeof window !== "undefined") {
-                    window.focus && window.focus();
-                    if (document.activeElement) {
-                      document.activeElement.blur();
-                    }
-                  }
                 }}
                 aria-label="Restart Game"
               >
@@ -1563,7 +986,7 @@ function App() {
         </div>
       </main>
     </div>
-  )
+  );
 }
 
 export default App;
