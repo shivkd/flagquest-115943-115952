@@ -191,7 +191,32 @@ function App() {
 
   // --- Keyboard controls + Reliable R-key Restart ---
   useEffect(() => {
+    // Prevent default scroll for X and R keys, and handle restart robustly.
     function handleDown(e) {
+      // --- Prevent page auto-scroll on X and R keys (and their uppercase) ---
+      if (
+        e.key === "x" ||
+        e.key === "X" ||
+        e.key === "r" ||
+        e.key === "R"
+      ) {
+        // Only prevent scrolling for unmodified keys (avoid interfering with screen readers)
+        if (
+          !e.altKey &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.shiftKey
+        ) {
+          // Only preventDefault if focused outside input fields (so accessibility is preserved)
+          const tag = e.target && e.target.tagName
+            ? e.target.tagName.toLowerCase()
+            : '';
+          if (!["input", "textarea", "select"].includes(tag)) {
+            e.preventDefault();
+          }
+        }
+      }
+
       // --- PRESS X TO START THE GAME (when showXToPlay is true) ---
       if (showXToPlay && (e.key === "x" || e.key === "X")) {
         setShowXToPlay(false);
@@ -211,12 +236,12 @@ function App() {
       if (["j", "J", "k", "K", "z", "Z"].includes(e.key)) { shootBullet(); }
       // -- R to restart level/game always
       if (e.key === "r" || e.key === "R") {
+        // Prevent repeated R from spamming
         // If in level completed/failed, restart at current. Otherwise restart whole game
         if (showLevelCompleted || showLevelFailed || gamestate === "failed" || gamestate === "postlevel") {
-          handleRestart(true, { restartAtCurrentLevel: true });
-          setShowLevelCompleted(false); setShowLevelFailed(false);
+          robustRestart(true, { restartAtCurrentLevel: true });
         } else {
-          handleRestart(true, { restartAtCurrentLevel: false });
+          robustRestart(true, { restartAtCurrentLevel: false });
         }
       }
     }
@@ -231,11 +256,11 @@ function App() {
       if (showXToPlay) return;
       if (e.button === 0 && running) { shootBullet(); }
     }
-    window.addEventListener("keydown", handleDown);
+    window.addEventListener("keydown", handleDown, { passive: false });
     window.addEventListener("keyup", handleUp);
     window.addEventListener("mousedown", handleMouseDown);
     return () => {
-      window.removeEventListener("keydown", handleDown);
+      window.removeEventListener("keydown", handleDown, { passive: false });
       window.removeEventListener("keyup", handleUp);
       window.removeEventListener("mousedown", handleMouseDown);
     };
@@ -518,26 +543,75 @@ function App() {
 
   // PUBLIC_INTERFACE
   const handleRestart = (autoStart = false, options = {}) => {
+    // Legacy: DELEGATED to robustRestart to avoid duplicated logic
+    robustRestart(autoStart, options);
+  };
+
+  /**
+   * PUBLIC_INTERFACE
+   * Fully reset and re-initialize all relevant game state for robust level/game restart.
+   * @param {boolean} autoStart - If true, immediately start running after restart.
+   * @param {object} options - Options object: {restartAtCurrentLevel: bool}
+   */
+  function robustRestart(autoStart = false, options = {}) {
+    // Reset overlay/level UI panels and in-progress dialogs
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
     setWinner(null);
     setMessage("");
+    // Clear control state
     keyState.current = {};
+
+    // Defensive reset for all dynamic game state pieces.
+    setBullets([]);
+    setBots([]);
+    setFlag({ x: 0, y: 0, heldBy: null, home: true });
+    setDropBox(null);
+    setObstacles([]);
+    setEnemyHp({});
+    setPlayer({
+      x: 60,
+      y: CANVAS_H / 2,
+      dx: 0,
+      dy: 0,
+      score: 0,
+      facing: 1,
+      lastMoveDir: { x: 1, y: 0 },
+      canShoot: true,
+      isShooting: false,
+      shootAnim: 0,
+      isJumping: false,
+      jumpPhase: 0,
+    });
+    setTimer(SESSION_TIME);
+
     if (options && options.restartAtCurrentLevel) {
-      setTimer(SESSION_TIME);
+      // Don't change level, but ensure field is re-initialized (useEffect on [level])
       setGamestate(autoStart ? "running" : "ready");
       setRunning(!!autoStart);
-
-      if (!autoStart) setShowXToPlay(true); // on restarts that are not auto, show X overlay again
-    } else {
-      setLevel(1);
-      setTimer(SESSION_TIME);
-      setGamestate(autoStart ? "running" : "ready");
-      setRunning(!!autoStart);
-
       if (!autoStart) setShowXToPlay(true);
+      // Trigger field/init by setting level to current - 1 then back (forces re-mount for hard reset)
+      setLevel(lvl => {
+        // This short cycle triggers the useEffect([level]) even if level didn't get changed externally
+        // If on first level, don't go below 1
+        const previous = Math.max(lvl - 1, 1);
+        const curr = lvl;
+        if (previous !== curr) {
+          setTimeout(() => setLevel(curr), 1);
+          return previous;
+        }
+        // If at lvl 1, force an update via a dummy state if needed
+        return curr;
+      });
+    } else {
+      // Reset to base level 1
+      setLevel(1);
+      setGamestate(autoStart ? "running" : "ready");
+      setRunning(!!autoStart);
+      if (!autoStart) setShowXToPlay(true);
+      // UseEffect([level]) will trigger new field/positions etc.
     }
-  };
+  }
 
   // --- Render UI info
   const pad = n => String(n).padStart(2, "0");
