@@ -1250,13 +1250,25 @@ function App() {
                     autoFocus
                     tabIndex={0}
                     onClick={() => {
+                      // Repair: FULLY clear overlays/states, advance to new level, ensure it's in running/game state with overlays off
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
+                      setWinner(null);
+                      setMessage("");
+                      setShowXToPlay(false); // skip X-to-play overlay for next level
                       setLevel(lvl => lvl + 1);
-                      // Restore gameplay control ON NEXT LEVEL: set running state, dismiss overlays, allow player input
-                      setGamestate("running");
-                      setRunning(true);
-                      setShowXToPlay(false); // skip X overlay for smooth progression
+                      // "level" useEffect will re-init field/entities; immediately start new level by setting state to running after short delay for state flush
+                      setTimeout(() => {
+                        setGamestate("running");
+                        setRunning(true);
+                      }, 5);
+                      // Defensive: clear any key input buffer or dialog focus
+                      if (typeof window !== "undefined") {
+                        window.focus && window.focus();
+                        if (document.activeElement) {
+                          document.activeElement.blur();
+                        }
+                      }
                     }}
                   >
                     Continue
