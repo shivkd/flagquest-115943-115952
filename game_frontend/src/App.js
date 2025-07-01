@@ -89,6 +89,9 @@ function App() {
   const [gamestate, setGamestate] = useState("ready"); // "ready" "running" "paused" "over"
   const [winner, setWinner] = useState(null);
   const [message, setMessage] = useState("");
+  // New: for explicit level/fail overlay control
+  const [showLevelCompleted, setShowLevelCompleted] = useState(false);
+  const [showLevelFailed, setShowLevelFailed] = useState(false);
 
   // --- Controls, Refs
   const canvasRef = useRef(null);
@@ -151,6 +154,8 @@ function App() {
     setWinner(null);
     setGamestate("ready");
     setRunning(false);
+    setShowLevelCompleted(false);
+    setShowLevelFailed(false);
 
   // We want to reset on level change (including initial mount)
   // eslint-disable-next-line
@@ -179,7 +184,10 @@ function App() {
       if (["ArrowLeft", "a", "A"].includes(e.key)) keyState.current.left = true;
       if (["ArrowRight", "d", "D"].includes(e.key)) keyState.current.right = true;
       if (e.key === "p" || e.key === "P") { if(running) handlePause(); }
-      if (e.key === "r" || e.key === "R") { handleRestart(true); }
+      // Add: allow R to restart at current level, overlays are dismissed
+      if (e.key === "r" || e.key === "R") { 
+        handleRestart(true, { restartAtCurrentLevel: true });
+      }
     }
     function handleUp(e) {
       if (["ArrowUp", "w", "W"].includes(e.key)) keyState.current.up = false;
@@ -296,25 +304,32 @@ function App() {
       let newPlayerScore = player.score, newLevel = level, newWin = null, endMsg = "";
       if (playerScored) {
         newPlayerScore += 1;
-        setMessage(`Level ${level} Cleared! +${level} pts.`);
+        setShowLevelCompleted(true);
+        setMessage(`Level ${level} Completed! Press R to retry or advance.`);
         if (level >= MAX_LEVEL) {
           setGamestate("over");
           setWinner("player");
+          setShowLevelCompleted(false);
           setMessage("Congratulations! You beat all levels!");
         } else {
-          setTimeout(()=>setLevel(lvl=>lvl+1), 1200);
+          // Wait for player to press R, don't auto-advance.
         }
         setDropBox(null);
-        // Reset flag, bots/positions next render by level effect
-        setTimer(SESSION_TIME);
+        // Pause timer/game on level success
+        setRunning(false);
+        setGamestate("postlevel"); // New gamestate for overlay
+        // Do NOT auto-set-timer or auto-set-level; resume/restart drives it.
       }
       // Game over from bot catch
       if (botCaught) {
         newWin = "bot";
         setGamestate("over");
         setWinner("bot");
-        setMessage("You were caught by a bot! Game Over.");
+        setShowLevelFailed(true);
+        setMessage("You Failed! Press R to retry this level.");
         setDropBox(null);
+        setRunning(false);
+        setGamestate("failed"); // New gamestate for failure/retry
       }
 
       // Carry flag with player if holding
@@ -500,30 +515,43 @@ function App() {
   }, [player, bots, flag, gamestate, winner, dropBox, obstacles]);
 
   // --- Button actions
+  // PUBLIC_INTERFACE
   const handleStart = () => {
     setGamestate("running");
     setRunning(true);
     setWinner(null);
     setMessage("");
+    setShowLevelCompleted(false);
+    setShowLevelFailed(false);
     if (timer <= 0 || gamestate === "over") setTimer(SESSION_TIME);
   };
+
+  // PUBLIC_INTERFACE
   const handlePause = () => {
     if (gamestate !== "running") return;
     setGamestate("paused");
     setRunning(false);
   };
-  const handleRestart = (autoStart = false) => {
-    setLevel(1);    // resets/initializes everything (and obstacles)
-    setTimer(SESSION_TIME);
+
+  // PUBLIC_INTERFACE
+  // add options: { restartAtCurrentLevel: boolean }
+  const handleRestart = (autoStart = false, options = {}) => {
+    setShowLevelCompleted(false);
+    setShowLevelFailed(false);
     setWinner(null);
     setMessage("");
     keyState.current = {};
-    if (autoStart) {
-      setGamestate("running");
-      setRunning(true);
+    if (options && options.restartAtCurrentLevel) {
+      // Remain at current level, only reset game field and timer
+      setTimer(SESSION_TIME);
+      setGamestate(autoStart ? "running" : "ready");
+      setRunning(!!autoStart);
     } else {
-      setGamestate("ready");
-      setRunning(false);
+      // Reset to first level
+      setLevel(1);    // resets/initializes everything (and obstacles)
+      setTimer(SESSION_TIME);
+      setGamestate(autoStart ? "running" : "ready");
+      setRunning(!!autoStart);
     }
   };
 
@@ -536,6 +564,18 @@ function App() {
     statusMsg = "Deliver the flag to the drop-off box!";
   if (!statusMsg && gamestate === "paused")
     statusMsg = "Game paused.";
+
+  // Show overlay for completed/failed state instead of just message bar
+  let showLevelOverlay = showLevelCompleted || showLevelFailed;
+  let levelOverlayMsg = "";
+  let overlayColor = "";
+  if (showLevelCompleted) {
+    levelOverlayMsg = `Level ${level} Completed!`;
+    overlayColor = "#197c2c";
+  } else if (showLevelFailed) {
+    levelOverlayMsg = "You Failed!";
+    overlayColor = "#e74c3c";
+  }
 
   // Level = points per win, difficulty scales by obstacles and bots
   const pointsForLevel = level;
@@ -602,7 +642,48 @@ function App() {
           </span>
         </div>
       </section>
-      {statusMsg && (
+      {/* LEVEL/FALIURE OVERLAY */}
+      {showLevelOverlay && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            margin: "auto",
+            zIndex: 5,
+            width: "100%",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              margin: "2.2rem auto -.5rem auto",
+              maxWidth: 410,
+              background: "#fff",
+              borderRadius: 16,
+              boxShadow: "0 4px 16px #e9ecef88",
+              border: `2.5px solid ${showLevelCompleted ? "#197c2c" : "#e74c3c"}`,
+              color: overlayColor,
+              fontWeight: 700,
+              fontSize: "1.58rem",
+              minHeight: 46,
+              padding: "1.1rem 0 .8rem 0",
+              textAlign: "center",
+              letterSpacing: "0.012em"
+            }}
+          >
+            {levelOverlayMsg}
+            <div style={{ fontWeight: 500, color: "#444", fontSize: 16, marginTop: 8 }}>
+              {showLevelCompleted
+                ? "Press 'R' to retry or advance."
+                : "Press 'R' to try this level again."}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Status message, fallback */}
+      {!showLevelOverlay && statusMsg && (
         <div
           style={{
             marginTop: ".82rem",
@@ -694,7 +775,7 @@ function App() {
           <button
             className="game-btn"
             tabIndex={0}
-            onClick={() => handleRestart(false)}
+            onClick={() => handleRestart(false, { restartAtCurrentLevel: true })}
             aria-label="Restart Game"
           >
             Restart
