@@ -1292,9 +1292,21 @@ function App() {
                   autoFocus
                   tabIndex={0}
                   onClick={() => {
-                    handleRestart(false, { restartAtCurrentLevel: true });
+                    // Fully clear overlays/states, robust restart, and immediately start gameplay
+                    handleRestart(true, { restartAtCurrentLevel: true });
                     setShowLevelCompleted(false);
                     setShowLevelFailed(false);
+                    setShowXToPlay(false);
+                    setWinner(null);
+                    setMessage("");
+                    setGamestate("running");
+                    setRunning(true);
+                    if (typeof window !== "undefined") {
+                      window.focus && window.focus();
+                      if (document.activeElement) {
+                        document.activeElement.blur();
+                      }
+                    }
                   }}
                 >
                   Restart
@@ -1477,9 +1489,22 @@ function App() {
               autoFocus
               aria-label="Restart Level"
               onClick={() => {
-                handleRestart(false, { restartAtCurrentLevel: true });
+                // Fully clear overlays/states, robust restart, and immediately start gameplay
+                handleRestart(true, { restartAtCurrentLevel: true });
                 setShowLevelCompleted(false);
                 setShowLevelFailed(false);
+                setShowXToPlay(false);
+                setWinner(null);
+                setMessage("");
+                setGamestate("running");
+                setRunning(true);
+                // Defensive: clear any key input buffer or dialog focus
+                if (typeof window !== "undefined") {
+                  window.focus && window.focus();
+                  if (document.activeElement) {
+                    document.activeElement.blur();
+                  }
+                }
               }}
             >
               Restart
@@ -1501,7 +1526,23 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={() => { handleRestart(false, { restartAtCurrentLevel: true }); }}
+                onClick={() => {
+                  // Robust restart logic: clear overlays, resume gameplay immediately
+                  handleRestart(true, { restartAtCurrentLevel: true });
+                  setShowLevelCompleted(false);
+                  setShowLevelFailed(false);
+                  setShowXToPlay(false);
+                  setWinner(null);
+                  setMessage("");
+                  setGamestate("running");
+                  setRunning(true);
+                  if (typeof window !== "undefined") {
+                    window.focus && window.focus();
+                    if (document.activeElement) {
+                      document.activeElement.blur();
+                    }
+                  }
+                }}
                 aria-label="Restart Game"
               >
                 Restart
