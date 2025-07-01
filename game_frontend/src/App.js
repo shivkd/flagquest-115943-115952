@@ -478,59 +478,417 @@ function App() {
       ctx.restore();
     }
 
-    // Actual flag (triangle/mini flag)
+    // --- FLAG: More realistic, cartoon sci-fi, with folds, shadows and shiny pole/base
+    /*
+      POLISHED FLAG REDESIGN (Cartoon sci-fi):
+      - Triangular banner with subtle curves (simulated fabric folds)
+      - Highlights and shadow for dynamic "wrinkle"
+      - Shiny, round metal pole + base for sci-fi feel
+      - Placeholder; swap with sprite/image later for more realism
+    */
     ctx.save();
     ctx.translate(flag.x, flag.y);
-    ctx.rotate(-Math.PI/14);
+    ctx.rotate(-Math.PI / 14);
+
+    // Flag pole (gradient for metal sci-fi shininess)
+    let poleLength = FLAG_SIZE + 9;
+    let poleGrad = ctx.createLinearGradient(0, 0, 0, poleLength);
+    poleGrad.addColorStop(0, "#c7e4fa");
+    poleGrad.addColorStop(0.32, "#68abec");
+    poleGrad.addColorStop(1, "#5cc1ff");
+    ctx.beginPath();
+    ctx.lineWidth = 3.6;
+    ctx.strokeStyle = poleGrad;
+    ctx.moveTo(-2.5, 0);
+    ctx.lineTo(-2.5, poleLength);
+    ctx.stroke();
+
+    // Pole base (shiny metallic base circle)
+    ctx.beginPath();
+    ctx.arc(-2.5, poleLength + 4, 5, 0, 2 * Math.PI);
+    let baseGrad = ctx.createRadialGradient(-2.5, poleLength + 4, 1, -2.5, poleLength + 4, 5);
+    baseGrad.addColorStop(0, "#fffbdc");
+    baseGrad.addColorStop(1, "#78deff");
+    ctx.fillStyle = baseGrad;
+    ctx.globalAlpha = 0.93;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Flag shape with dynamic curved edge to mimic flutter/fold
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(FLAG_SIZE, -FLAG_SIZE / 2.2); // top point
+    // Arc bottom edge for "flutter"
+    ctx.quadraticCurveTo(
+      FLAG_SIZE * 0.95,
+      FLAG_SIZE * 0.46 + Math.sin(performance.now()/430) * 4,
+      FLAG_SIZE * 0.7,
+      FLAG_SIZE / 2.4
+    );
+    ctx.lineTo(0, FLAG_SIZE * 0.31);
+    ctx.closePath();
+
+    // Main fill (bright when held by player, accent otherwise, with soft highlight)
+    let flagColor = flag.heldBy === "player" ? CLR_PRI : CLR_ACC;
+    let flagGrad = ctx.createLinearGradient(0, 0, FLAG_SIZE * 1.1, 0);
+    flagGrad.addColorStop(0, "#fffefd");
+    flagGrad.addColorStop(0.11, flagColor);
+    flagGrad.addColorStop(1, "#bbf4fa");
+
+    ctx.fillStyle = flagGrad;
+    ctx.globalAlpha = 0.95;
+    ctx.shadowColor = "#55daffb0";
+    ctx.shadowBlur = 7;
+    ctx.fill();
+
+    // Fabric folds: gentle darker/sparkly lines
+    ctx.globalAlpha = 0.3;
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.moveTo(FLAG_SIZE * 0.57, -FLAG_SIZE * 0.14);
+    ctx.quadraticCurveTo(
+      FLAG_SIZE * 0.8,
+      2 + Math.sin(performance.now()/350) * 5,
+      FLAG_SIZE * 0.45,
+      FLAG_SIZE * 0.19
+    );
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#2af9e954";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(FLAG_SIZE * 0.9, -FLAG_SIZE * 0.2);
+    ctx.bezierCurveTo(
+      FLAG_SIZE * 0.94,
+      2 + Math.cos(performance.now()/410) * 2,
+      FLAG_SIZE * 0.84,
+      FLAG_SIZE * 0.18,
+      FLAG_SIZE * 0.66,
+      FLAG_SIZE * 0.24
+    );
+    ctx.lineWidth = 1.7;
+    ctx.strokeStyle = "#2c9bfa3c";
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    // Glow around flag edge for sci-fi polish
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(FLAG_SIZE, -FLAG_SIZE / 2.2);
-    ctx.lineTo(FLAG_SIZE, FLAG_SIZE / 2.2);
+    ctx.quadraticCurveTo(
+      FLAG_SIZE * 0.95,
+      FLAG_SIZE * 0.46,
+      FLAG_SIZE * 0.7,
+      FLAG_SIZE / 2.4
+    );
+    ctx.lineTo(0, FLAG_SIZE * 0.31);
     ctx.closePath();
-    ctx.fillStyle = flag.heldBy === "player" ? CLR_PRI : CLR_ACC;
-    ctx.fill();
-    ctx.strokeStyle = "#444";
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, FLAG_SIZE + 7);
+    ctx.shadowColor = flag.heldBy === "player" ? "#11e9ffaa" : "#ffd44dcc";
+    ctx.shadowBlur = 14;
+    ctx.globalAlpha = 0.18;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 7.5;
     ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Player (circle)
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, PLAYER_SIZE / 2, 0, 2 * Math.PI, false);
-    ctx.fillStyle = CLR_PRI;
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#135488";
+    // Outline
+    ctx.lineWidth = 1.56;
+    ctx.strokeStyle = "#225";
+    ctx.globalAlpha = 0.82;
     ctx.stroke();
-    // Name
-    ctx.font = "bold 15px Arial";
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    ctx.restore();
+
+    // --- Player: robot-human cartoon hybrid (robotlimbs, glowing eyes, friendly face)
+    /*
+      PLAYER REDESIGN:
+      Friendly humanoid robot: round blue head, metal arms and legs, sci-fi torso, cyan-glow round eyes.
+      Placeholder only (swap with image/sprite for full polish).
+    */
+    ctx.save();
+    ctx.translate(player.x, player.y);
+
+    // Torso/Body
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 10, 13, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#72eaff";
+    ctx.shadowColor = "#7fffd4";
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -10, 9.1, 0, Math.PI * 2);
+    ctx.fillStyle = "#46cbf9";
+    ctx.shadowColor = "#12fbff88";
+    ctx.shadowBlur = 5;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Glowing cyan eyes (cartoon, friendly, humanoid)
+    ctx.beginPath();
+    ctx.arc(-3.4, -12.3, 2.1, 0, Math.PI * 2);
+    ctx.arc(3.4, -12.3, 2.1, 0, Math.PI * 2);
+    ctx.fillStyle = "#f4feff";
+    ctx.shadowColor = "#87f0f9cc";
+    ctx.shadowBlur = 7;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Mouth (smile, friendly)
+    ctx.beginPath();
+    ctx.arc(0, -7.7, 2.6, Math.PI * 0.16, Math.PI * 0.81, false);
+    ctx.lineWidth = 1.15;
+    ctx.strokeStyle = "#24d7fa";
+    ctx.globalAlpha = 0.65;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Metal Arms
+    ctx.save();
+    // left arm
+    ctx.beginPath();
+    ctx.moveTo(-8, -2);
+    ctx.lineTo(-18, 13);
+    ctx.lineWidth = 4.3;
+    ctx.strokeStyle = "#abdfff";
+    ctx.shadowColor = "#87e6ff55";
+    ctx.shadowBlur = 4;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // joint
+    ctx.beginPath();
+    ctx.arc(-18, 13, 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = "#eee";
+    ctx.fill();
+
+    // right arm
+    ctx.beginPath();
+    ctx.moveTo(8, -2);
+    ctx.lineTo(18, 13);
+    ctx.lineWidth = 4.3;
+    ctx.strokeStyle = "#abdfff";
+    ctx.shadowColor = "#87e6ffc8";
+    ctx.shadowBlur = 4;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // joint
+    ctx.beginPath();
+    ctx.arc(18, 13, 2.3, 0, Math.PI * 2);
+    ctx.fillStyle = "#eee";
+    ctx.fill();
+    ctx.restore();
+
+    // Legs
+    ctx.save();
+    // left leg
+    ctx.beginPath();
+    ctx.moveTo(-5, 17);
+    ctx.lineTo(-8, 28);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#93e4fc";
+    ctx.shadowColor = "#87e6ff55";
+    ctx.shadowBlur = 4;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // right leg
+    ctx.beginPath();
+    ctx.moveTo(5, 17);
+    ctx.lineTo(8, 28);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#93e4fc";
+    ctx.shadowColor = "#87e6ff99";
+    ctx.shadowBlur = 4;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // feet (simple robotics joints)
+    ctx.beginPath();
+    ctx.arc(-8, 28, 2, 0, Math.PI * 2);
+    ctx.arc(8, 28, 2, 0, Math.PI * 2);
+    ctx.fillStyle = "#dde1eb";
+    ctx.fill();
+    ctx.restore();
+
+    // Outline for clarity
+    ctx.save();
+    ctx.globalAlpha = 0.70;
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 10.8, 14, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = "#1a528c";
+    ctx.lineWidth = 2.3;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -10, 9.5, 0, Math.PI * 2);
+    ctx.strokeStyle = "#0a86be";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Name label
+    ctx.font = "bold 15px Poppins, Arial";
     ctx.fillStyle = "#1976d2";
     ctx.textAlign = "center";
-    ctx.fillText("You", player.x, player.y - PLAYER_SIZE / 1.1);
+    ctx.fillText("You", 0, -22);
 
     // Flag carried icon
     if (flag.heldBy === "player") {
-      ctx.font = "900 16px Segoe UI, Arial";
+      ctx.font = "900 18px Segoe UI, Arial";
       ctx.fillStyle = CLR_ACC;
-      ctx.fillText("🏳️", player.x, player.y + 5);
+      ctx.textAlign = "center";
+      ctx.shadowColor = "#fff7";
+      ctx.shadowBlur = 6;
+      ctx.fillText("🏳️", 0, -2);
+      ctx.shadowBlur = 0;
     }
 
-    // Bots
-    bots.forEach((bot, i) => {
-      ctx.beginPath();
-      ctx.arc(bot.x, bot.y, BOT_SIZE / 2, 0, 2 * Math.PI, false);
-      ctx.fillStyle = CLR_BOT;
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = CLR_BOT_DARK;
-      ctx.stroke();
+    ctx.restore();
 
-      ctx.font = "bold 13px Arial";
-      ctx.fillStyle = "#711";
+    // --- ENEMY BOTS: Menacing, evil cartoon robots, sci-fi, angular silhouettes & red glowing angry eyes
+    /*
+      ENEMY BOT REDESIGN:
+      - Angular head/body, sharp edges, elongated limbs
+      - Deep magenta/dark colors, evil glowing red eyes
+      - Placeholder only (swap with art/sprite later)
+      - All visual styling is 2D cartoon-sci-fi evil
+    */
+    bots.forEach((bot, i) => {
+      ctx.save();
+      ctx.translate(bot.x, bot.y);
+
+      // Body: angular torso
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.lineTo(10, 19);
+      ctx.lineTo(0, 24);
+      ctx.lineTo(-10, 19);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(193,30,226,0.94)";
+      ctx.shadowColor = "#ff0050aa";
+      ctx.shadowBlur = 7;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Head: angular, sharp, angry helmet shape, glowing red
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-7, -14);
+      ctx.lineTo(0, -25 - Math.sin(performance.now()/302 + i)*2.7);
+      ctx.lineTo(7, -14);
+      ctx.lineTo(2.8, -8);
+      ctx.lineTo(-2.8, -8);
+      ctx.closePath();
+      ctx.fillStyle = "#a30026";
+      ctx.shadowColor = "#f00";
+      ctx.shadowBlur = 9;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Eyes: Angry red, glowing, slanted for menace
+      ctx.beginPath();
+      ctx.ellipse(-2.7, -14, 2, 2.6, Math.PI * -.08, 0, Math.PI*2);
+      ctx.ellipse(2.7, -14, 2, 2.6, Math.PI * .07, 0, Math.PI*2);
+      ctx.fillStyle = "#ff383c";
+      ctx.shadowColor = "#ff7878";
+      ctx.shadowBlur = 12;
+      ctx.globalAlpha = 0.92;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // Mouth: jaggy, evil
+      ctx.beginPath();
+      ctx.moveTo(-2, -5);
+      ctx.lineTo(-0.6, -3.8);
+      ctx.lineTo(0, -3.7);
+      ctx.lineTo(0.7, -3.8);
+      ctx.lineTo(2, -5.3);
+      ctx.strokeStyle = "#f61765";
+      ctx.lineWidth = 1.05;
+      ctx.globalAlpha = 0.81;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Arms: angular, sharp, metal
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-10, 3);
+      ctx.lineTo(-20, 10 + Math.sin(performance.now()/220 + i*3)*6);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = "#520018";
+      ctx.shadowColor = "#ff82ef88";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(10, 3);
+      ctx.lineTo(20, 10 + Math.cos(performance.now()/200 - i)*5);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = "#520018";
+      ctx.shadowColor = "#f8f8fa88";
+      ctx.shadowBlur = 6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // Legs: mechanical, jagged
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(-5, 23);
+      ctx.lineTo(-9.5, 34 + Math.sin(performance.now()/290 - i*1.9)*3.5);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = "#42001a";
+      ctx.shadowColor = "#a70026aa";
+      ctx.shadowBlur = 4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(5, 23);
+      ctx.lineTo(9.5, 34 + Math.cos(performance.now()/251 + i*1.7)*3.5);
+      ctx.lineWidth = 4.2;
+      ctx.strokeStyle = "#42001a";
+      ctx.shadowColor = "#f52a00aa";
+      ctx.shadowBlur = 4;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // Outline for clarity
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      ctx.moveTo(0, -7);
+      ctx.lineTo(10, 19);
+      ctx.lineTo(0, 24);
+      ctx.lineTo(-10, 19);
+      ctx.closePath();
+      ctx.strokeStyle = "#500042";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Name/label
+      ctx.font = "bold 12px Poppins, Arial";
+      ctx.fillStyle = "#680027";
       ctx.textAlign = "center";
-      ctx.fillText(`Bot${i + 1}`, bot.x, bot.y - BOT_SIZE / 1.18);
+      ctx.fillText(`Bot${i + 1}`, 0, -25);
+
+      ctx.restore();
+
+      // --- PLACEHOLDER NOTE: To integrate custom/external art assets (spritesheets, png, or SVG),
+      // replace the above drawing routines with ctx.drawImage(sprite, ...) or advanced Sprite objects.
+      // For production visual polish, import art to /src/assets and swap in here.
+      // Keep silhouettes/clarity strong at all group sizes.
     });
 
     // End overlay
