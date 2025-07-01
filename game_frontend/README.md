@@ -1,82 +1,96 @@
-# Lightweight React Template for KAVIA
+# FlagQuest Frontend
 
-This project provides a minimal React template with a clean, modern UI and minimal dependencies.
+## Cartoonish Sci-Fi Capture-the-Flag Game
+
+This frontend implements a 2D capture-the-flag game with an emphasis on a **cartoonish, sci-fi visual style** featuring vibrant colors, soft shadows, and a polished, professional-quality UI. Assets and sound hooks are integrated with room for future custom art and SFX.
+
+---
 
 ## Features
 
-- **Lightweight**: No heavy UI frameworks - uses only vanilla CSS and React
-- **Modern UI**: Clean, responsive design with KAVIA brand styling
-- **Fast**: Minimal dependencies for quick loading times
-- **Simple**: Easy to understand and modify
+- **Cartoonish Sci-Fi Aesthetic:** Custom color palette, rounded shapes, soft drop shadows, and playful UI cues
+- **2D Polished Graphics:** Canvas rendering with visual effects, outlines, and glow/shadow effects; placeholder game tokens for characters, bots, and flags
+- **Dynamic Sound Effects:** Sound hooks for events (flag pickup/drop, scoring, collisions, game win/loss); future support for music and SFX via `/assets` folder
+- **Responsive Layout:** Game canvas centered, flexible controls below, scoreboard and status above
+- **Accessible Controls:** Start, Pause, Restart buttons remain prominent and themed
+- **Easy Integration for Custom Assets:** Current release uses placeholder art (shapes/icons); easily swap in spritesheets, backgrounds, or effects. SFX hooks documented in `App.js` for direct sound API or library integration
+
+---
 
 ## Getting Started
 
 In the project directory, you can run:
 
-### `npm start`
-
-Runs the app in development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
-
-### `npm test`
-
-Launches the test runner in interactive watch mode.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-## Customization
-
-### Colors
-
-The main brand colors are defined as CSS variables in `src/App.css`:
-
-```css
-:root {
-  --kavia-orange: #E87A41;
-  --kavia-dark: #1A1A1A;
-  --text-color: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-}
+```bash
+npm start
 ```
 
-### Components
+Runs the app in development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view the game.
 
-This template uses pure HTML/CSS components instead of a UI framework. You can find component styles in `src/App.css`. 
+---
 
-Common components include:
-- Buttons (`.btn`, `.btn-large`)
-- Container (`.container`)
-- Navigation (`.navbar`)
-- Typography (`.title`, `.subtitle`, `.description`)
+## Style Guide
 
-## Learn More
+### Color Palette (sci-fi cartoon-inspired)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- **Primary:** #46cbf9 (neon blue/cyan)
+- **Secondary:** #9bff4a (vivid sci-fi green)
+- **Accent:** #ffd44d (electric yellow)
+- **Bot Enemy:** #ff7bfa (magenta)
+- **Background:** #23264d (deep purple/blue gradient)
+- **Panels:** #303865 (polished bluish-grey)
+- **Shadows/Glow:** rgba(70,203,249,0.35), rgba(155,255,74,0.18)
 
-### Code Splitting
+Defined and referenced via CSS variables in `src/App.css`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Fonts, Borders, and Polish
 
-### Analyzing the Bundle Size
+- **Font:** `Poppins, Segoe UI, Arial, sans-serif` (rounded, friendly)
+- **Border Radius:** All panels/buttons have `16px` or `50%` (circles)
+- **Shadow:** Soft drop-shadows/glow on canvas and UI
+- **Buttons:** Large, playful, colored; gentle press effect
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Sound Integration
 
-### Making a Progressive Web App
+- Sound effects triggered on significant events (button click, flag pickup/scoring, level up, game over)
+- **SFX Placeholder:** Sound hooks present—integrate custom sounds into `/src/assets/` or as external URLs for future production polish
+- To add: Replace or extend `playSound` utility and place actual files in `/src/assets/sfx/` (see notes in `App.js`)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+---
 
-### Advanced Configuration
+## Directory Structure & Asset Notes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- `/src/App.js` – Main game, rendering, sound effect triggers (documented for integration)
+- `/src/App.css` – Theme, cartoon sci-fi palette, shadows, sizing, font
+- `/src/assets/` – Placeholder for future game images, SFX, and sprites
+- **[Placeholder Art]**: Current pieces use stylized shapes. Add/replace with character/bot/flag/background illustrations for advanced polish.
 
-### Deployment
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Customization & Theming
 
-### `npm run build` fails to minify
+Edit `/src/App.css` to adjust:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- --sci-primary, --sci-secondary, --sci-accent
+- --bg-sci, --panel, --shadow-sci
+- Font-family, border-radius, shadow
+
+---
+
+## Sound Effects
+
+To enable SFX, see the `playSound` and sound hook areas in `/src/App.js`. Integrate `.mp3`, `.wav`, or `.ogg` using modern browser APIs or a sound library such as `howler.js` if more power/control is needed.
+
+---
+
+## Roadmap
+
+- Integrate custom art assets, icons, and backgrounds
+- Add actual SFX/music for all gameplay triggers
+- Optional: Polish game win/lose overlays with full-screen effects
+
+---
+
+For details, see source comments in `App.js` and style entries in `App.css`.
+

@@ -1,6 +1,18 @@
 import React, { useRef, useEffect, useState } from "react";
 import "./App.css";
 
+/*
+  ==============================
+  CARTOON SCI-FI STYLE INTEGRATION
+  ==============================
+  - Uses vibrant palette, pronounced visual polish, glow/shadow, roundness.
+  - All core palette colors are extracted from CSS variables (see App.css).
+  - Placeholder assets: Game elements are drawn as stylized, rounded shapes (to be swapped with assets later).
+  - Sound support: Use playSound helper to trigger SFX on important actions.
+  - To integrate custom SFX, add files to /src/assets/sfx/ and update playSound mapping.
+  - To integrate sprite art: Replace in-canvas drawing with drawing Image objects or Sprite components in future.
+*/
+
 /**
  * PUBLIC_INTERFACE
  * FlagQuest: Full feature 2D capture-the-flag game, minimal UI.
@@ -10,9 +22,10 @@ import "./App.css";
  * - Responsive for small screens.
  */
 
-// ---- Constants, color theme ----
+/* ---- Constants, color palette from cartoon-sci-fi theme ---- */
 const CANVAS_W = 440;
 const CANVAS_H = 320;
+
 const PLAYER_SIZE = 24;
 const BOT_SIZE = 24;
 const FLAG_SIZE = 18;
@@ -25,12 +38,46 @@ const BASE_NUM_BOTS = 2;
 const BASE_NUM_OBSTACLES = 0;
 const MAX_LEVEL = 8;
 
-// Accent colors
-const CLR_PRI = "#2196f3", CLR_SEC = "#43a047", CLR_ACC = "#ff9800";
-const CLR_BOT = "#f25266";
-const CLR_BOT_DARK = "#ab1549";
+// Pull cartoon sci-fi palette using CSS vars for consistent theming
+function getCssVar(v, fallback) {
+  if (typeof window === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(v) || fallback;
+}
+const CLR_PRI = getCssVar('--sci-primary', '#46cbf9').trim() || "#46cbf9";
+const CLR_SEC = getCssVar('--sci-secondary', '#9bff4a').trim() || "#9bff4a";
+const CLR_ACC = getCssVar('--sci-accent', '#ffd44d').trim() || "#ffd44d";
+const CLR_BOT = getCssVar('--sci-magenta', '#ff7bfa').trim() || "#ff7bfa";
+const CLR_BOT_DARK = "#d13ce6";
 
-// ---- Utility helpers ----
+/* ---- Utility helpers ---- */
+
+// PUBLIC_INTERFACE
+function playSound(eventType) {
+  /**
+   * Play a sound based on the event type.
+   * Placeholder implementation: Loads a sound FX URL assigned for each event.
+   * Integrate with 'howler.js' for advanced, or use Audio() for light build.
+   * Future: Place custom SFX files in /src/assets/sfx/
+   */
+  const sfxMap = {
+    "flag-pickup": "https://cdn.pixabay.com/audio/2022/10/16/audio_12ac80c89e.mp3", // placeholder
+    "score": "https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa8c79.mp3",
+    "fail": "https://cdn.pixabay.com/audio/2022/07/26/audio_1264cc2f3e.mp3",
+    "gameover": "https://cdn.pixabay.com/audio/2022/07/26/audio_1264cc2f3e.mp3",
+    "advance": "https://cdn.pixabay.com/audio/2022/10/16/audio_12a4d3e613.mp3",
+    "click": "https://cdn.pixabay.com/audio/2022/07/26/audio_1261a15e16.mp3",
+  };
+  const url = sfxMap[eventType] || sfxMap["click"];
+  // eslint-disable-next-line
+  if (typeof window !== "undefined") {
+    try {
+      const audio = new window.Audio(url);
+      audio.volume = 0.25; // Friendly FX
+      audio.play();
+    } catch (e) {}
+  }
+}
+
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
 }
@@ -281,6 +328,7 @@ function App() {
         newFlag.heldBy = "player";
         newFlag.home = false;
         setDropBox(randomDropBox(CANVAS_W, CANVAS_H, 58));
+        playSound("flag-pickup"); // SFX: Flag acquired
       }
 
       // Bots catch player if close (game over)
@@ -303,6 +351,7 @@ function App() {
         newPlayerScore += 1;
         setShowLevelCompleted(true);
         setMessage(`Level ${level} Completed! Press R to retry or advance.`);
+        playSound("score"); // SFX: Player scores
         if (level >= MAX_LEVEL) {
           setGamestate("over");
           setWinner("player");
@@ -327,6 +376,7 @@ function App() {
         setDropBox(null);
         setRunning(false);
         setGamestate("failed"); // New gamestate for failure/retry
+        playSound("fail");
       }
 
       // Carry flag with player if holding
@@ -520,6 +570,7 @@ function App() {
     setMessage("");
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
+    playSound("click");
     if (timer <= 0 || gamestate === "over") setTimer(SESSION_TIME);
   };
 
@@ -528,6 +579,7 @@ function App() {
     if (gamestate !== "running") return;
     setGamestate("paused");
     setRunning(false);
+    playSound("click");
   };
 
   // PUBLIC_INTERFACE
@@ -688,6 +740,8 @@ function App() {
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
                       setLevel(lvl => lvl + 1);
+                      playSound("advance");
+                      // Future: trigger full-screen sparkle!
                     }}
                   >
                     Continue
@@ -700,6 +754,7 @@ function App() {
                       handleRestart(false, { restartAtCurrentLevel: true });
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
+                      playSound("click");
                     }}
                   >
                     Restart
@@ -716,6 +771,7 @@ function App() {
                     handleRestart(false, { restartAtCurrentLevel: true });
                     setShowLevelCompleted(false);
                     setShowLevelFailed(false);
+                    playSound("click");
                   }}
                 >
                   Restart
@@ -835,7 +891,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={handleStart}
+                onClick={() => { handleStart(); playSound("click"); }}
                 disabled={gamestate === "running"}
                 aria-label="Start Game"
               >
@@ -844,7 +900,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={handlePause}
+                onClick={() => { handlePause(); playSound("click"); }}
                 disabled={gamestate !== "running"}
                 aria-label="Pause"
               >
@@ -853,7 +909,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={() => handleRestart(false, { restartAtCurrentLevel: true })}
+                onClick={() => { handleRestart(false, { restartAtCurrentLevel: true }); playSound("click"); }}
                 aria-label="Restart Game"
               >
                 Restart

@@ -1,66 +1,118 @@
 :root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --text-primary: #263238;
-  --primary: #2196f3;
-  --secondary: #43a047;
-  --accent: #ff9800;
-  --border-color: #e9ecef;
-  --button-bg: #2196f3;
-  --button-text: #ffffff;
+  /* Cartoonish Sci-Fi Palette */
+  --sci-primary: #46cbf9;
+  --sci-secondary: #9bff4a;
+  --sci-accent: #ffd44d;
+  --sci-magenta: #ff7bfa;
+  --bg-sci: linear-gradient(135deg, #23264d 0%, #34428e 100%);
+  --panel: #303865;
+  --surface: #2d334b;
+  --panel-dk: #23264d;
+  --text-primary: #f0f6ff;
+  --text-secondary: #e1f0f4;
+  --shadow-sci: 0 4px 20px 3px rgba(70,203,249,0.23), 0 1.5px 7px 0 #13093d33;
+  --outline: #00e5e5;
+  --border-color: #4bb0e6;
+  --button-bg: var(--sci-primary);
+  --button-text: #181e30;
 }
+
 
 .App {
   min-height: 100vh;
   text-align: center;
-  background-color: var(--bg-primary);
+  background: var(--bg-sci);
   color: var(--text-primary);
-  font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+  font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+  position: relative;
 }
 
 header {
   width: 100%;
-  background: var(--bg-secondary);
-  box-shadow: 0 2px 12px 0 rgba(33,150,243,0.025);
+  background: var(--panel);
+  box-shadow: var(--shadow-sci);
+  border-bottom: 2.5px solid var(--border-color);
+}
+header h1 {
+  letter-spacing: 0.03em;
+  color: var(--sci-accent);
+  text-shadow: 0 4px 8px #1da2c4cc, 0 1px 0 #fff5;
+  font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
 }
 
 .game-btn {
-  background: var(--button-bg);
+  background: linear-gradient(95deg, var(--sci-primary) 65%, #fff 210%);
   color: var(--button-text);
-  padding: 12px 34px;
+  padding: 13px 40px;
   border: none;
-  border-radius: 8px;
-  font-size: 18px;
-  font-weight: 600;
-  box-shadow: 0 2px 10px -3px rgba(33,150,243,0.09);
+  border-radius: 15px;
+  font-size: 19px;
+  font-weight: 700;
+  box-shadow: 0 4px 16px -2px #46cbf94a, 0 1.5px 5.5px #1d238a55;
   cursor: pointer;
-  outline: none;
-  transition: background 0.20s, transform 0.08s;
+  outline: 0;
+  transition: background 0.18s, transform 0.08s, box-shadow 0.14s;
+  border-bottom: 3.5px solid var(--sci-secondary);
+  margin: 0 2px;
 }
 .game-btn:active {
-  transform: scale(0.94);
-  background: #1769aa;
+  transform: scale(0.93);
+  background: linear-gradient(95deg,#13b7f4 90%,#b8ff37 110%);
+  box-shadow: 0 1.5px 5.5px #0aafee85;
 }
 .game-btn:hover {
-  background: #1976d2;
+  filter: brightness(1.07);
+  background: linear-gradient(88deg,#68dfff 62%,#e1ffe7 104%);
 }
 
 canvas:focus {
-  box-shadow: 0 0 0 3px var(--accent);
+  box-shadow: 0 0 0 3px var(--sci-accent), 0 0 20px 9px #ffd44d44;
+  outline: none;
 }
 
 li {
-  margin-bottom: 4px;
-  color: #444;
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 97%;
 }
 
 ::-webkit-scrollbar {
-  width: 7px;
-  background: #e9ecef;
+  width: 8px;
+  background: #31365a;
 }
 ::-webkit-scrollbar-thumb {
-  background: #b0c4d8;
-  border-radius: 4px;
+  background: #5be6bd;
+  border-radius: 40px;
+  border: 2px solid #21244f;
+}
+
+section, main {
+  background: var(--panel);
+  border-radius: 22px;
+  margin-top: 0.7rem;
+  margin-bottom: 1.3rem;
+  box-shadow: var(--shadow-sci);
+}
+
+[aria-label="Game Area"] {
+  background: linear-gradient(160deg,#1e2350 55%,#4ad2ff55 120%);
+  border: 2.6px solid var(--border-color);
+  border-radius: 18px;
+  box-shadow: 0 8px 30px #00e5e51b, 0 1.5px 7px 0 #00e5e51b;
+}
+
+[aria-label="Game Canvas"] {
+  background: none !important;
+}
+
+kbd {
+  background: #2d334b;
+  color: var(--sci-accent);
+  border-radius: 7px;
+  padding: 0.07em 0.5em;
+  box-shadow: 0 2px 5px #1215302e;
+  font-size: 93%;
 }
 
 @media (max-width: 900px) {
@@ -104,3 +156,15 @@ input[type=number]::-webkit-outer-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* SCIFI SPARK/SHINE ANIMATION - placeholder effect for asset art, can assign */
+@keyframes sci-sparkle {
+  0% { filter: brightness(1.02) drop-shadow(0 0 6px #ffd44d99); }
+  60% { filter: brightness(1.15) drop-shadow(0 0 15px #ffd44d88); }
+  100% { filter: brightness(1.02) drop-shadow(0 0 8px #ffd44d66); }
+}
+
+.sci-sparkle {
+  animation: sci-sparkle 2.3s infinite alternate;
+}
+

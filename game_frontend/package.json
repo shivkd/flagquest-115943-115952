@@ -2,6 +2,7 @@
   "name": "react-kavia",
   "version": "0.1.0",
   "private": true,
+  "description": "Cartoon sci-fi 2D capture-the-flag game (FlagQuest), rich visuals, shadow, sound support, ready for asset/SFX polish",
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
