@@ -565,93 +565,337 @@ function App() {
       ctx.restore();
     }
 
-    // Draw bots (simple: single magenta circle + eye, no fancy limbs/animations)
+    // --- Draw ENEMY BOTS (Complex robotic/cartoony style, distinct personality) ---
     for (const bot of bots) {
       ctx.save();
       ctx.translate(bot.x, bot.y);
-      // Body
+
+      // --- Drop Shadow
+      ctx.save();
+      ctx.globalAlpha = 0.30;
       ctx.beginPath();
-      ctx.arc(0, 0, BOT_SIZE / 2, 0, 2 * Math.PI);
+      ctx.ellipse(0, 13, 12, 5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "#842c74";
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // -- Body: main chassis (squat dome with "jaw" underplate) --
+      ctx.beginPath();
+      ctx.ellipse(0, 0, BOT_SIZE / 2, BOT_SIZE / 2.25, 0, 0, Math.PI * 2);
       let hpEnt = enemyHp[bot.id] || { hp: 3, hitAnim: 0 };
       if (hpEnt.hitAnim > 0.1) {
-        ctx.globalAlpha = 0.55 + 0.4 * Math.abs(Math.cos(hpEnt.hitAnim * 21));
+        ctx.globalAlpha = 0.52 + 0.43 * Math.abs(Math.cos(hpEnt.hitAnim * 21));
       }
-      ctx.fillStyle = CLR_BOT;
-      ctx.strokeStyle = "#b843ac";
-      ctx.lineWidth = 2.2;
-      ctx.shadowColor = "#ffabfd";
+      ctx.fillStyle = "#f0b9fc";
+      ctx.shadowColor = "#ffbcf6";
       ctx.shadowBlur = 10;
       ctx.fill();
-      ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.globalAlpha = 1;
-      // Eye
+      ctx.lineWidth = 2.2;
+      ctx.strokeStyle = "#b843ac";
+      ctx.stroke();
+      // Lower jaw plate
       ctx.beginPath();
-      ctx.arc(0, -3, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
+      ctx.ellipse(0, 11, 11, 6, 0, Math.PI * 2, false);
+      ctx.fillStyle = "#fdf5fe";
+      ctx.globalAlpha = 0.70;
       ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // -- Eye: Large robotic glass with glint
       ctx.beginPath();
-      ctx.arc(0, -3, 2, 0, Math.PI * 2);
-      ctx.fillStyle = "#474da7";
+      ctx.ellipse(0, -4, 7, 5, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = "#fff";
+      ctx.shadowColor = "#c6c9ff";
+      ctx.shadowBlur = 7;
       ctx.fill();
-      // HP dots above head
+      ctx.shadowBlur = 0;
+
+      ctx.beginPath();
+      ctx.ellipse(0, -4, 4.1, 2.7, 0, 0, 2 * Math.PI);
+      ctx.fillStyle = "#382454";
+      ctx.fill();
+
+      // Eye highlight
+      ctx.beginPath();
+      ctx.arc(-1.9, -6, 1.2, 0, Math.PI * 2);
+      ctx.fillStyle = "#caf1ff";
+      ctx.globalAlpha = 0.62;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Evil "eyebrows"
+      ctx.save();
+      ctx.strokeStyle = "#8d2ea1";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-5, -8.2);
+      ctx.quadraticCurveTo(0, -12, 5, -8.1);
+      ctx.stroke();
+      ctx.restore();
+
+      // -- Unique details: ["antenna", body highlights, jawline bolts, jaw-grill]
+      // Antenna
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, -BOT_SIZE/2 + 3, 2.38, 0, Math.PI*2);
+      ctx.fillStyle = "#ffd44d";
+      ctx.shadowColor = "#ffe899";
+      ctx.shadowBlur = 7;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.moveTo(0, -BOT_SIZE/2 + 3); // ball
+      ctx.lineTo(0, -BOT_SIZE/2 + 10);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#8267fb";
+      ctx.stroke();
+      ctx.restore();
+
+      // Cheek bolts (cartoon robot)
+      ctx.beginPath();
+      ctx.arc(-8.2, 1, 1.33, 0, Math.PI * 2);
+      ctx.arc(8.2, 1, 1.33, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffd44d";
+      ctx.globalAlpha = 0.74;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Jaw "grill" (vertical teeth lines)
+      ctx.save();
+      ctx.strokeStyle = "#bd8fdc";
+      ctx.lineWidth = 1.1;
+      for (let gx = -5; gx <= 5; gx += 2.5) {
+        ctx.beginPath();
+        ctx.moveTo(gx, 8);
+        ctx.lineTo(gx, 14.2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Side panels / body accents
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(-9.8, 0.1, 2.1, 2.7, -0.38, 0, Math.PI * 2);
+      ctx.ellipse(9.8, -0.7, 2.1, 2.7, 0.38, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff99e7";
+      ctx.globalAlpha = 0.6;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+
+      // -- "Arms": Little claw arms (angle, body-side color)
+      ctx.save();
+      ctx.strokeStyle = "#dbbcf9";
+      ctx.lineWidth = 3.3;
+      ctx.beginPath();
+      ctx.moveTo(-BOT_SIZE/2 + 2, 3);
+      ctx.lineTo(-BOT_SIZE/2 - 5, 8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(BOT_SIZE/2 - 2, 3);
+      ctx.lineTo(BOT_SIZE/2 + 5, 8);
+      ctx.stroke();
+      // Claw ends
+      ctx.lineWidth = 2.1;
+      ctx.beginPath();
+      ctx.arc(-BOT_SIZE/2 - 5, 8, 2, 0, Math.PI*2);
+      ctx.arc(BOT_SIZE/2 + 5, 8, 2, 0, Math.PI*2);
+      ctx.strokeStyle = "#ffebf9";
+      ctx.stroke();
+      ctx.restore();
+
+      // -- Leg "tracks"/wheels
+      ctx.save();
+      ctx.fillStyle = "#d066e1";
+      ctx.beginPath();
+      ctx.ellipse(-5, BOT_SIZE/2 - 3, 3.1, 1.5, 0.15, 0, Math.PI*2);
+      ctx.ellipse(5, BOT_SIZE/2 - 3, 3.1, 1.5, -0.15, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+
+      // HP dots above head (robotic "LEDs")
       ctx.save();
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
         ctx.arc(-7 + i * 7, -18, 2.4, 0, 2 * Math.PI);
-        ctx.fillStyle = (hpEnt.hp > i) ? "#fff" : "#808088";
-        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = i < hpEnt.hp ? "#fff" : "#885e9b";
+        ctx.globalAlpha = 0.88;
         ctx.fill();
         ctx.globalAlpha = 1;
       }
       ctx.restore();
+
+      // Name label (above head, robot cartoon font style)
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.font = "700 13px Poppins, Arial";
+      ctx.fillStyle = "#b722b1";
+      ctx.textAlign = "center";
+      ctx.fillText("BOT", 0, -23);
+      ctx.restore();
+
       ctx.restore();
     }
 
-    // Draw Player (simple circle + color band)
+    // --- Draw PLAYER (complex friendly sci-fi android/hero-bot style, unique)
     ctx.save();
     ctx.translate(player.x, player.y);
 
-    // Shadow (simple ellipse, offset downward)
+    // Drop Shadow, larger and softer
     ctx.save();
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.38;
     ctx.beginPath();
-    ctx.ellipse(0, 16, 14, 6, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "#1581ab29";
+    ctx.ellipse(0, 16, 14, 6.1, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#33acf72d";
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // Body
-    ctx.beginPath();
-    ctx.arc(0, 0, PLAYER_SIZE / 2, 0, 2 * Math.PI);
-    ctx.fillStyle = CLR_PRI;
-    ctx.shadowColor = "#6cf9ea";
-    ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 2.1;
-    ctx.strokeStyle = "#11bcef";
-    ctx.stroke();
-
-    // Face band (oval/helmet visor)
-    ctx.beginPath();
-    ctx.ellipse(0, -5, 8, 3, 0, 0, 2 * Math.PI);
-    ctx.fillStyle = "#fff";
-    ctx.globalAlpha = 0.22;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // Small eyes
+    // -- Main Body (rounded pill + 3D chest panel) --
     ctx.save();
     ctx.beginPath();
-    ctx.arc(-4, -5, 1.7, 0, Math.PI * 2);
-    ctx.arc( 4, -5, 1.7, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
+    ctx.ellipse(0, 0, PLAYER_SIZE / 2, PLAYER_SIZE / 2.12, 0, 0, Math.PI * 2); // main torso
+    ctx.fillStyle = CLR_PRI;
+    ctx.shadowColor = "#94fdff";
+    ctx.shadowBlur = 13;
     ctx.fill();
-    ctx.globalAlpha = 1; ctx.restore();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 2.18;
+    ctx.strokeStyle = "#17e1fe";
+    ctx.stroke();
+    // 3D chest/visor panel
+    ctx.beginPath();
+    ctx.ellipse(0, 2.6, 9, 6.0, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
 
-    // Holding a flag?
+    // -- Helmet "visor" (large faceplate, blue tint, shiny)
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 9, 5.5, 0, 0, 2 * Math.PI);
+    ctx.fillStyle = "#e0fcff";
+    ctx.globalAlpha = 0.26;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 8, 4.7, 0.05, 0, 2 * Math.PI);
+    ctx.fillStyle = "#b8ecfb";
+    ctx.globalAlpha = 0.38;
+    ctx.fill();
+    // Shine
+    ctx.beginPath();
+    ctx.ellipse(-3.2, -8, 2.2, 0.85, -0.28, 0, 2 * Math.PI);
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.33;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // -- Eyes (anime/cartoony, glowing blue)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(-3.2, -7.1, 1.35, 0, Math.PI * 2);
+    ctx.arc( 3.5, -7.0, 1.35, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.globalAlpha = 0.8;
+    ctx.shadowColor = "#73ecff";
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    // Pupils/irises
+    ctx.beginPath();
+    ctx.arc(-3.2, -7.2, 0.6, 0, Math.PI * 2);
+    ctx.arc( 3.5, -7.1, 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = "#249df7";
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // Eyebrows (friendly curve)
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-4.4, -9);
+    ctx.quadraticCurveTo(-3.1, -10, -1.7, -8.8);
+    ctx.moveTo(2, -9.2);
+    ctx.quadraticCurveTo(3.8, -10.1, 5.6, -8.5);
+    ctx.strokeStyle = "#36b6ea";
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.7;
+    ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+
+    // -- Antenna module (asym LED, adds charm)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, -PLAYER_SIZE/2 + 2.5, 2.2, 0, Math.PI*2);
+    ctx.fillStyle = "#ffd44d";
+    ctx.globalAlpha = 0.93;
+    ctx.shadowColor = "#fff2ad";
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -PLAYER_SIZE/2 + 2.5);
+    ctx.lineTo(0.8, -PLAYER_SIZE/2 + 8.5);
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = "#17e1fe";
+    ctx.stroke();
+    ctx.restore();
+
+    // -- Arms (chubby metallic limbs with accent detail)
+    ctx.save();
+    ctx.lineWidth = 5.2;
+    ctx.strokeStyle = "#93eaff";
+    ctx.beginPath();
+    // Left Arm
+    ctx.moveTo(-PLAYER_SIZE/2+2, 0);
+    ctx.lineTo(-PLAYER_SIZE/2-7, 7);
+    // Right Arm
+    ctx.moveTo(PLAYER_SIZE/2-2, 0);
+    ctx.lineTo(PLAYER_SIZE/2+7, 7);
+    ctx.stroke();
+
+    // Arm fingerprints
+    ctx.lineWidth = 2.1;
+    ctx.strokeStyle = "#ffd44d";
+    ctx.beginPath();
+    ctx.moveTo(-PLAYER_SIZE/2-6, 7);
+    ctx.lineTo(-PLAYER_SIZE/2-4, 8.9);
+    ctx.moveTo(PLAYER_SIZE/2+6, 7);
+    ctx.lineTo(PLAYER_SIZE/2+4, 8.9);
+    ctx.stroke();
+    ctx.restore();
+
+    // -- Wheeled track base/"feet"
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(-5.5, PLAYER_SIZE/2-2.5, 3.5, 1.7, 0.12, 0, Math.PI*2);
+    ctx.ellipse(5.5, PLAYER_SIZE/2-2.5, 3.5, 1.7, -0.12, 0, Math.PI*2);
+    ctx.fillStyle = "#27eada";
+    ctx.globalAlpha = 0.72;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // -- Cheek "LEDs"
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(-8.2, 0, 1.33, 0, Math.PI * 2);
+    ctx.arc(8.2, 0.8, 1.33, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffd44d";
+    ctx.globalAlpha = 0.75;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // -- If holding a flag, draw the flag
     if (flag && flag.heldBy === "player") {
       ctx.save();
       ctx.translate(13, 8);
@@ -673,13 +917,13 @@ function App() {
       ctx.restore();
     }
 
-    // Name label (above, small)
+    // Name label (above, in friendly accent blue)
     ctx.save();
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = 0.88;
     ctx.font = "bold 14px Poppins, Arial";
-    ctx.fillStyle = "#1976d2";
+    ctx.fillStyle = "#1799e7";
     ctx.textAlign = "center";
-    ctx.fillText("You", 0, -17);
+    ctx.fillText("YOU", 0, -20);
     ctx.restore();
 
     ctx.restore();
