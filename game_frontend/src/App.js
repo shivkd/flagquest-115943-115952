@@ -51,10 +51,7 @@ const CLR_BOT_DARK = "#d13ce6";
 
 /* ---- Utility helpers ---- */
 
-// Gun SFX: placeholder, customize as needed
-const SHOOT_SFX = "https://cdn.pixabay.com/audio/2022/11/16/audio_12b05e9424.mp3";
-const HIT_SFX = "https://cdn.pixabay.com/audio/2022/02/15/audio_115b6fbe3b.mp3";
-const ENEMY_DEFEAT_SFX = "https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa8c79.mp3";
+
 
 // Compute a direction vector (normalized)
 function dirVec(dx, dy) {
@@ -62,32 +59,7 @@ function dirVec(dx, dy) {
   if (!mag) return { x: 1, y: 0 };
   return { x: dx / mag, y: dy / mag };
 }
-// PUBLIC_INTERFACE
-function playSound(eventType) {
-  /**
-   * Play a sound based on the event type.
-   * Placeholder implementation: Loads a sound FX URL assigned for each event.
-   * Integrate with 'howler.js' for advanced, or use Audio() for light build.
-   * Future: Place custom SFX files in /src/assets/sfx/
-   */
-  const sfxMap = {
-    "flag-pickup": "https://cdn.pixabay.com/audio/2022/10/16/audio_12ac80c89e.mp3", // placeholder
-    "score": "https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa8c79.mp3",
-    "fail": "https://cdn.pixabay.com/audio/2022/07/26/audio_1264cc2f3e.mp3",
-    "gameover": "https://cdn.pixabay.com/audio/2022/07/26/audio_1264cc2f3e.mp3",
-    "advance": "https://cdn.pixabay.com/audio/2022/10/16/audio_12a4d3e613.mp3",
-    "click": "https://cdn.pixabay.com/audio/2022/07/26/audio_1261a15e16.mp3",
-  };
-  const url = sfxMap[eventType] || sfxMap["click"];
-  // eslint-disable-next-line
-  if (typeof window !== "undefined") {
-    try {
-      const audio = new window.Audio(url);
-      audio.volume = 0.25; // Friendly FX
-      audio.play();
-    } catch (e) {}
-  }
-}
+
 
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
@@ -255,7 +227,6 @@ function App() {
       // JUMP (space)
       if ((e.key === " " || e.key === "Spacebar") && !player.isJumping && running) {
         setPlayer(pl => ({ ...pl, isJumping: true, jumpPhase: 0 }));
-        playSound("click");
       }
       // SHOOT (J or K or Z, future: mouse)
       if (["j","J","k","K","z","Z"].includes(e.key)) {
@@ -411,7 +382,6 @@ function App() {
           newEnemyHp[bot.id] = hpEnt;
           // If HP drops to 0, mark bot for defeat
           if (hpEnt.hp <= 0) botsToDefeat.add(bot.id);
-          playSoundEffect(HIT_SFX, 0.18);
           hpDelta = true;
           continue; // Bullet is destroyed on hit
         }
@@ -421,7 +391,6 @@ function App() {
       // --- Enemy defeat removal ---
       let remainingBots = botArr.filter(b => !(botsToDefeat.has(b.id)));
       if (botsToDefeat.size) {
-        playSoundEffect(ENEMY_DEFEAT_SFX, 0.21);
         // Spark "defeat" animation? (future: add visual effect), currently just remove
       }
 
@@ -438,7 +407,6 @@ function App() {
         newFlag.heldBy = "player";
         newFlag.home = false;
         setDropBox(randomDropBox(CANVAS_W, CANVAS_H, 58));
-        playSound("flag-pickup");
       }
 
       // --- Bots catch player (game over) ---
@@ -460,7 +428,6 @@ function App() {
         newPlayerScore += 1;
         setShowLevelCompleted(true);
         setMessage(`Level ${level} Completed! Press R to retry or advance.`);
-        playSound("score");
         if (level >= MAX_LEVEL) {
           setGamestate("over");
           setWinner("player");
@@ -480,7 +447,6 @@ function App() {
         setDropBox(null);
         setRunning(false);
         setGamestate("failed");
-        playSound("fail");
       }
 
       // Flag follows player if holding
@@ -530,20 +496,12 @@ function App() {
     setPlayer(pl => ({
       ...pl, isShooting: true, shootAnim: 0, canShoot: false
     }));
-    playSoundEffect(SHOOT_SFX, 0.19);
     // Cooldown
     shootCooldown.current = true;
     setTimeout(() => {
       shootCooldown.current = false;
       setPlayer(pl => ({ ...pl, canShoot: true }));
     }, 350);
-  }
-
-  // SFX: non-blocking
-  function playSoundEffect(url, volume = 0.18) {
-    if (typeof window !== "undefined") {
-      try { const a = new window.Audio(url); a.volume = volume; a.play(); } catch (e) { }
-    }
   }
 
   // --- Rendering the canvas/game area
@@ -1318,7 +1276,6 @@ function App() {
     setMessage("");
     setShowLevelCompleted(false);
     setShowLevelFailed(false);
-    playSound("click");
     if (timer <= 0 || gamestate === "over") setTimer(SESSION_TIME);
   };
 
@@ -1327,7 +1284,6 @@ function App() {
     if (gamestate !== "running") return;
     setGamestate("paused");
     setRunning(false);
-    playSound("click");
   };
 
   // PUBLIC_INTERFACE
@@ -1488,7 +1444,6 @@ function App() {
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
                       setLevel(lvl => lvl + 1);
-                      playSound("advance");
                       // Future: trigger full-screen sparkle!
                     }}
                   >
@@ -1502,7 +1457,6 @@ function App() {
                       handleRestart(false, { restartAtCurrentLevel: true });
                       setShowLevelCompleted(false);
                       setShowLevelFailed(false);
-                      playSound("click");
                     }}
                   >
                     Restart
@@ -1519,7 +1473,6 @@ function App() {
                     handleRestart(false, { restartAtCurrentLevel: true });
                     setShowLevelCompleted(false);
                     setShowLevelFailed(false);
-                    playSound("click");
                   }}
                 >
                   Restart
@@ -1639,7 +1592,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={() => { handleStart(); playSound("click"); }}
+                onClick={handleStart}
                 disabled={gamestate === "running"}
                 aria-label="Start Game"
               >
@@ -1648,7 +1601,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={() => { handlePause(); playSound("click"); }}
+                onClick={handlePause}
                 disabled={gamestate !== "running"}
                 aria-label="Pause"
               >
@@ -1657,7 +1610,7 @@ function App() {
               <button
                 className="game-btn"
                 tabIndex={0}
-                onClick={() => { handleRestart(false, { restartAtCurrentLevel: true }); playSound("click"); }}
+                onClick={() => { handleRestart(false, { restartAtCurrentLevel: true }); }}
                 aria-label="Restart Game"
               >
                 Restart
